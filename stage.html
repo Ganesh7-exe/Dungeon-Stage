@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dungeon Stage · Projector</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+        cursor: none;
+      }
+      body.calibrating {
+        cursor: crosshair;
+      }
+      #stage-wrap {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #status {
+        position: fixed;
+        left: 12px;
+        bottom: 10px;
+        color: #9aa4b2;
+        font: 12px/1.4 "Segoe UI", sans-serif;
+        pointer-events: none;
+        opacity: 0.9;
+        transition: opacity 0.4s ease;
+        z-index: 5;
+        max-width: min(90vw, 520px);
+      }
+      .corner-handles {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+      }
+      .corner-handles.hidden {
+        display: none;
+      }
+      .corner-handle {
+        position: absolute;
+        width: 28px;
+        height: 28px;
+        margin: -14px 0 0 -14px;
+        border-radius: 999px;
+        border: 2px solid #d4a017;
+        background: rgba(20, 24, 32, 0.9);
+        color: #f5d67b;
+        font: 700 10px/28px "Segoe UI", sans-serif;
+        text-align: center;
+        cursor: grab;
+        user-select: none;
+        touch-action: none;
+      }
+      .corner-handle:active {
+        cursor: grabbing;
+      }
+    </style>
+  </head>
+  <body class="calibrating">
+    <div id="stage-wrap">
+      <canvas id="stage-canvas"></canvas>
+      <div id="stage-handles" class="corner-handles"></div>
+    </div>
+    <div id="status">Waiting for Control… H hide · F fullscreen · G grid · B guide · R resync</div>
+    <script type="module" src="/src/stage-window.js"></script>
+  </body>
+</html>

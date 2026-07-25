@@ -1,0 +1,10 @@
+Quaternius — Cute Animated Monsters (CC0)
+https://opengameart.org/content/textured-cute-monster-pack
+Converted OBJ+PNG → GLB for Dungeon Stage.
+
+Included: dragon, demon, ogre, cyclops, yeti, beholder (cthulhu),
+lich (ghost), skeleton (skull), bat, wolf (deer/stag).
+
+For a more “premium / cinematic” look beyond free stylized packs:
+buy/download higher-poly CC or paid models from Sketchfab, or generate
+with Meshy/Tripo, then drop .glb files into this folder using the same names.

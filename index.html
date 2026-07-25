@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dungeon Stage</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Sora:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <p class="brand-mark">Dungeon Stage</p>
+          <p class="brand-tag">Box projection · live voice</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="open-stage" type="button" class="btn btn-primary">Open Stage</button>
+          <button id="resync-stage" type="button" class="btn btn-ghost">Resync</button>
+          <button id="save-scene" type="button" class="btn btn-ghost">Save</button>
+          <button id="projector-ready" type="button" class="btn btn-soft">Trial mode</button>
+        </div>
+        <p id="stage-link-status" class="topbar-status">Stage not linked yet</p>
+      </header>
+
+      <div class="workspace">
+        <aside id="control" class="rail rail-left" aria-label="Stage controls">
+          <div class="rail-head">
+            <span class="rail-kicker">Stage</span>
+            <h2 class="rail-title">Objects</h2>
+            <p class="rail-copy">Pick a creature, place it on the box, map projector corners.</p>
+          </div>
+
+          <section class="card">
+            <div class="card-head">
+              <h3>Projector</h3>
+            </div>
+            <p class="hint">
+              Open Stage on the projector → F / F11 → drag TL/TR/BR/BL onto the box → H hides handles.
+            </p>
+            <div class="check-stack">
+              <label class="check">
+                <input type="checkbox" id="test-backdrop" checked />
+                <span>Test backdrop</span>
+              </label>
+              <label class="check">
+                <input type="checkbox" id="show-box-guide" checked />
+                <span>Show box guide</span>
+              </label>
+              <label class="check">
+                <input type="checkbox" id="calibration-grid" />
+                <span>Calibration grid</span>
+              </label>
+              <label class="check">
+                <input type="checkbox" id="preview-warp" />
+                <span>Preview projector warp</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <h3>Box mapping</h3>
+            </div>
+            <div class="corner-grid" id="corner-controls"></div>
+            <div class="btn-row">
+              <button id="reset-corners" type="button" class="btn btn-ghost">Reset corners</button>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <h3>Character</h3>
+            </div>
+            <p id="character-name" class="character-name">—</p>
+            <div class="btn-row">
+              <button id="prev" type="button" class="btn btn-ghost">Previous</button>
+              <button id="next" type="button" class="btn btn-primary">Next</button>
+            </div>
+            <ol id="character-list" class="character-list"></ol>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <h3>Place on box</h3>
+            </div>
+            <div class="radio-stack">
+              <label class="radio">
+                <input type="radio" name="placement-mode" value="fit" checked />
+                <span>Fit to box <em>center · size only</em></span>
+              </label>
+              <label class="radio">
+                <input type="radio" name="placement-mode" value="move" />
+                <span>Move model <em>drag on preview</em></span>
+              </label>
+            </div>
+            <p id="placement-hint" class="hint">
+              Model stays centered on the box. Only size can change.
+            </p>
+            <div id="move-controls" class="hidden">
+              <p class="hint">Left-click the model on the preview, hold, and drag.</p>
+              <label class="field">
+                <span class="field-label">Left / Right <output id="pos-x-out">0.00</output></span>
+                <input id="pos-x" type="range" min="-1.2" max="1.2" step="0.01" value="0" />
+              </label>
+              <label class="field">
+                <span class="field-label">Front / Back <output id="pos-z-out">0.00</output></span>
+                <input id="pos-z" type="range" min="-1.2" max="1.2" step="0.01" value="0" />
+              </label>
+            </div>
+            <label class="field">
+              <span class="field-label">Size <output id="pos-scale-out">1.00</output></span>
+              <input id="pos-scale" type="range" min="0.3" max="2.5" step="0.01" value="1" />
+            </label>
+            <label class="check">
+              <input type="checkbox" id="pos-spin" checked />
+              <span>Spin</span>
+            </label>
+            <div class="btn-row">
+              <button id="reset-placement" type="button" class="btn btn-ghost">Reset size / place</button>
+            </div>
+          </section>
+        </aside>
+
+        <section class="preview-pane" aria-label="Stage preview">
+          <div class="preview-header">
+            <div>
+              <strong>Live preview</strong>
+              <span class="preview-sub">What lands on the box</span>
+            </div>
+            <span id="preview-status" class="status-pill">Loading…</span>
+          </div>
+          <div class="preview-stage-wrap">
+            <canvas id="preview-canvas"></canvas>
+            <div id="preview-handles" class="corner-handles hidden"></div>
+          </div>
+        </section>
+
+        <aside id="voice-rail" class="rail rail-right" aria-label="Voice Lab">
+          <div class="rail-head voice-head">
+            <span class="rail-kicker voice-kicker">Voice</span>
+            <h2 class="rail-title">Voice Lab</h2>
+            <p class="rail-copy">
+              Built-in D&amp;D mic FX. Headphones for testing. For Discord use free
+              <a href="https://vb-audio.com/Cable/" target="_blank" rel="noreferrer">VB-Cable</a>
+              (Output → CABLE Input, Discord mic → CABLE Output).
+            </p>
+          </div>
+
+          <section class="card card-voice">
+            <div class="card-head">
+              <h3>Live test</h3>
+              <span class="badge">Mic</span>
+            </div>
+            <div class="btn-row">
+              <button id="voice-start" type="button" class="btn btn-voice">Start mic test</button>
+              <button id="voice-stop" type="button" class="btn btn-ghost">Stop</button>
+            </div>
+            <div class="btn-row">
+              <button id="voice-mute" type="button" class="btn btn-ghost">Mute output</button>
+              <button id="voice-assign" type="button" class="btn btn-voice-soft">Assign to character</button>
+            </div>
+            <div class="btn-row">
+              <button id="voice-loop-record" type="button" class="btn btn-ghost">Record 3s loop</button>
+              <button id="voice-loop-stop" type="button" class="btn btn-ghost">Stop loop</button>
+            </div>
+            <p id="voice-lab-status" class="hint">Idle — press Start mic test</p>
+            <div class="meter-row" aria-label="Input level">
+              <span>Level</span>
+              <div class="meter-track"><div id="voice-level" class="meter-fill"></div></div>
+            </div>
+            <label class="field">
+              <span class="field-label">Mic input</span>
+              <select id="voice-input"></select>
+            </label>
+            <label class="field">
+              <span class="field-label">Output (speakers / VB-Cable)</span>
+              <select id="voice-output"></select>
+            </label>
+          </section>
+
+          <section class="card card-voice">
+            <div class="card-head">
+              <h3>Character voice</h3>
+              <span class="badge badge-gold">35+ presets</span>
+            </div>
+            <label class="field">
+              <span class="field-label">D&amp;D voice preset</span>
+              <select id="voice-preset"></select>
+            </label>
+            <p id="voice-assigned-label" class="hint">Current stage character voice: —</p>
+            <div class="voice-tweak-grid">
+              <label class="field">
+                <span class="field-label">Pitch <output id="voice-pitch-out">0</output></span>
+                <input id="voice-pitch" type="range" min="-12" max="12" step="1" value="0" />
+              </label>
+              <label class="field">
+                <span class="field-label">Body size <output id="voice-formant-out">0</output></span>
+                <input id="voice-formant" type="range" min="-12" max="12" step="1" value="0" />
+              </label>
+              <label class="field">
+                <span class="field-label">Sub weight <output id="voice-sub-out">0.00</output></span>
+                <input id="voice-sub" type="range" min="0" max="1" step="0.01" value="0" />
+              </label>
+              <label class="field">
+                <span class="field-label">Double voice <output id="voice-detune-out">0.00</output></span>
+                <input id="voice-detune" type="range" min="0" max="1" step="0.01" value="0" />
+              </label>
+              <label class="field">
+                <span class="field-label">Growl <output id="voice-growl-out">0.00</output></span>
+                <input id="voice-growl" type="range" min="0" max="1" step="0.01" value="0" />
+              </label>
+              <label class="field">
+                <span class="field-label">Metallic <output id="voice-ring-out">0.00</output></span>
+                <input id="voice-ring" type="range" min="0" max="1" step="0.01" value="0" />
+              </label>
+              <label class="field">
+                <span class="field-label">Breath <output id="voice-air-out">0.00</output></span>
+                <input id="voice-air" type="range" min="0" max="1" step="0.01" value="0" />
+              </label>
+              <label class="field">
+                <span class="field-label">Grit <output id="voice-drive-out">0.00</output></span>
+                <input id="voice-drive" type="range" min="0" max="1" step="0.01" value="0" />
+              </label>
+            </div>
+
+            <details class="tweak-advanced">
+              <summary>Fine tune · EQ &amp; space</summary>
+              <div class="voice-tweak-grid">
+                <label class="field">
+                  <span class="field-label">Bass <output id="voice-low-out">0</output></span>
+                  <input id="voice-low" type="range" min="-12" max="12" step="1" value="0" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Mid <output id="voice-mid-out">0</output></span>
+                  <input id="voice-mid" type="range" min="-12" max="12" step="1" value="0" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Treble <output id="voice-high-out">0</output></span>
+                  <input id="voice-high" type="range" min="-12" max="12" step="1" value="0" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Clarity <output id="voice-presence-out">3</output></span>
+                  <input id="voice-presence" type="range" min="-6" max="12" step="1" value="3" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Chorus <output id="voice-chorus-out">0.00</output></span>
+                  <input id="voice-chorus" type="range" min="0" max="1" step="0.01" value="0" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Wobble <output id="voice-vibrato-out">0.00</output></span>
+                  <input id="voice-vibrato" type="range" min="0" max="1" step="0.01" value="0" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Echo <output id="voice-delay-out">0.00</output></span>
+                  <input id="voice-delay" type="range" min="0" max="0.8" step="0.01" value="0" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Room <output id="voice-reverb-out">0.08</output></span>
+                  <input id="voice-reverb" type="range" min="0" max="0.7" step="0.01" value="0.08" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Volume <output id="voice-gain-out">1.20</output></span>
+                  <input id="voice-gain" type="range" min="0.2" max="2.2" step="0.05" value="1.2" />
+                </label>
+              </div>
+            </details>
+            <div class="btn-row">
+              <button id="voice-reset-tweak" type="button" class="btn btn-ghost">Reset tweaks</button>
+              <button id="voice-save-tweak" type="button" class="btn btn-soft">Save tweaks</button>
+            </div>
+            <label class="check">
+              <input type="checkbox" id="voice-on-select" checked />
+              <span>Auto-apply on character change</span>
+            </label>
+          </section>
+
+          <details class="card card-optional">
+            <summary>
+              <span>Optional · Voicemod</span>
+              <em>paid / external</em>
+            </summary>
+            <p class="hint">
+              Only if you still use Voicemod. API key from
+              <a href="https://control-api.voicemod.net/getting-started/" target="_blank" rel="noreferrer">docs</a>.
+            </p>
+            <label class="field">
+              <span class="field-label">API key</span>
+              <input id="voicemod-key" type="password" placeholder="Paste key" autocomplete="off" />
+            </label>
+            <div class="btn-row">
+              <button id="voicemod-connect" type="button" class="btn btn-ghost">Connect</button>
+              <button id="voicemod-refresh" type="button" class="btn btn-ghost">Refresh</button>
+            </div>
+            <p id="voicemod-status" class="hint">Disconnected</p>
+            <label class="field">
+              <span class="field-label">Voicemod voice for character</span>
+              <select id="actor-voice"></select>
+            </label>
+            <div class="btn-row">
+              <button id="apply-voice" type="button" class="btn btn-ghost">Apply Voicemod</button>
+              <button id="clear-voice" type="button" class="btn btn-ghost">Clear</button>
+            </div>
+            <label class="check">
+              <input type="checkbox" id="voicemod-on-select" />
+              <span>Also auto-apply Voicemod on character change</span>
+            </label>
+          </details>
+        </aside>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

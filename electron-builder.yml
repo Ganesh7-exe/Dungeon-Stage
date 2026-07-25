@@ -1,0 +1,33 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.dungeonstage.app",
+  "productName": "Dungeon Stage",
+  "copyright": "Copyright © Dungeon Stage",
+  "directories": {
+    "output": "C:/Users/studd/AppData/Local/DungeonStageBuild/release-v3",
+    "buildResources": "electron/build"
+  },
+  "files": [
+    "electron/main.cjs",
+    "package.json"
+  ],
+  "extraResources": [
+    {
+      "from": "dist",
+      "to": "app-dist"
+    }
+  ],
+  "asar": true,
+  "win": {
+    "target": [
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "artifactName": "DungeonStage-${version}-portable.${ext}"
+  },
+  "portable": {
+    "artifactName": "DungeonStage-${version}-portable.${ext}"
+  }
+}
