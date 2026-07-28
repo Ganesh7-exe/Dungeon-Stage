@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dungeon Stage · Align to real box</title>
+    <style>
+      :root {
+        --bg: #0b0e14;
+        --panel: #121821;
+        --line: #2a3544;
+        --text: #d7dde8;
+        --muted: #8b96a8;
+        --accent: #d4a017;
+        --map-blue: #0f3a52;
+        --step: #1a2330;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
+      }
+
+      #app {
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        height: 100%;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.55rem 0.85rem;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .toolbar h1 {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 650;
+        letter-spacing: 0.01em;
+      }
+
+      .toolbar .muted {
+        color: var(--muted);
+        font-size: 0.78rem;
+      }
+
+      .toolbar-spacer {
+        flex: 1;
+      }
+
+      .toolbar label {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: var(--muted);
+      }
+
+      .toolbar select,
+      .toolbar button,
+      .toolbar input[type="number"],
+      .steps button,
+      .advanced summary,
+      .advanced select,
+      .advanced input,
+      .advanced button {
+        background: #182131;
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0.35rem 0.65rem;
+        font: inherit;
+      }
+
+      .toolbar button.primary,
+      .steps .primary {
+        background: #2a2110;
+        border-color: #6b5318;
+        color: #f0d58a;
+        cursor: pointer;
+      }
+
+      .toolbar button:hover,
+      .steps button:hover {
+        border-color: #4a5a70;
+        cursor: pointer;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1.4fr;
+        gap: 0.55rem;
+        padding: 0.55rem 0.85rem;
+        border-bottom: 1px solid var(--line);
+        background: #0e131b;
+      }
+
+      .step {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        padding: 0.5rem 0.65rem;
+        border-radius: 8px;
+        background: var(--step);
+        border: 1px solid var(--line);
+        min-width: 0;
+      }
+
+      .step-num {
+        color: var(--accent);
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .step strong {
+        font-size: 0.82rem;
+      }
+
+      .step p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.72rem;
+      }
+
+      .step-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-top: 0.2rem;
+      }
+
+      .box-size-fields {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.35rem;
+        margin-top: 0.15rem;
+      }
+
+      .box-size-fields label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        color: var(--muted);
+        font-size: 0.68rem;
+      }
+
+      .box-size-fields input {
+        width: 100%;
+        min-width: 0;
+        background: #182131;
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0.3rem 0.4rem;
+        font: inherit;
+      }
+
+      .output-display-fields {
+        grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+        align-items: end;
+      }
+
+      .output-display-fields select {
+        width: 100%;
+        min-width: 0;
+        background: #182131;
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0.3rem 0.4rem;
+        font: inherit;
+      }
+
+      .checkbox-inline {
+        flex-direction: row !important;
+        align-items: center;
+        gap: 0.4rem !important;
+        padding-bottom: 0.35rem;
+        font-size: 0.72rem !important;
+        color: var(--text) !important;
+      }
+
+      .checkbox-inline input {
+        width: auto;
+        min-width: 0;
+      }
+
+      .advanced {
+        margin: 0;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .advanced summary {
+        display: list-item;
+        cursor: pointer;
+        padding: 0.45rem 0.85rem;
+        border: none;
+        border-radius: 0;
+        background: transparent;
+        color: var(--muted);
+      }
+
+      .advanced-body {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0 0.85rem 0.65rem;
+      }
+
+      .advanced-body label {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        color: var(--muted);
+      }
+
+      .advanced-note {
+        width: 100%;
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.72rem;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        min-height: 0;
+        height: 100%;
+      }
+
+      .pane {
+        position: relative;
+        min-width: 0;
+        min-height: 0;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        border-right: 1px solid var(--line);
+      }
+
+      .pane:last-child {
+        border-right: none;
+      }
+
+      .pane-head {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        padding: 0.5rem 0.7rem;
+        background: #0e131b;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .pane-head .title-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.5rem;
+      }
+
+      .pane-head strong {
+        font-size: 0.82rem;
+      }
+
+      .pane-head .hint {
+        color: var(--muted);
+        font-size: 0.74rem;
+      }
+
+      .pane-head .align-callout {
+        color: #f0d58a;
+        font-size: 0.78rem;
+        font-weight: 600;
+      }
+
+      .pane-body {
+        position: relative;
+        min-height: 0;
+        background: #000;
+      }
+
+      .pane-body.map-output {
+        background: var(--map-blue);
+        padding: 18px;
+      }
+
+      .pane-body.map-output .stage-frame {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.35);
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .corner-handles {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        overflow: visible;
+      }
+
+      .corner-handles.hidden {
+        display: none;
+      }
+
+      .corner-handle {
+        position: absolute;
+        width: 36px;
+        height: 36px;
+        margin: -18px 0 0 -18px;
+        border-radius: 999px;
+        border: 2px solid var(--accent);
+        background: rgba(20, 24, 32, 0.95);
+        color: #f5d67b;
+        font: 700 11px/36px "Segoe UI", sans-serif;
+        text-align: center;
+        cursor: grab;
+        user-select: none;
+        touch-action: none;
+        z-index: 5;
+        pointer-events: auto;
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45);
+      }
+
+      .corner-handle.outside-frame {
+        border-style: dashed;
+        box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.35);
+      }
+
+      #output-canvas {
+        pointer-events: none;
+      }
+
+      .corner-handle:active {
+        cursor: grabbing;
+      }
+
+      .footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.45rem 0.85rem;
+        border-top: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+
+      #status {
+        color: #b7c0ce;
+      }
+
+      @media (max-width: 980px) {
+        .steps {
+          grid-template-columns: 1fr;
+        }
+
+        .split {
+          grid-template-columns: 1fr;
+          grid-template-rows: 1.2fr 0.8fr;
+        }
+
+        .pane {
+          border-right: none;
+          border-bottom: 1px solid var(--line);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header class="toolbar">
+        <div>
+          <h1>Align to real box</h1>
+          <div class="muted">
+            Set box size → open on projector → drag four corners onto the real box
+          </div>
+        </div>
+        <div class="toolbar-spacer"></div>
+        <button type="button" id="btn-fit-corners">Reset to full rectangle</button>
+        <button type="button" id="btn-resync">Resync</button>
+        <button type="button" id="btn-open-output" class="primary">
+          Open on projector
+        </button>
+      </header>
+
+      <section class="steps" aria-label="Real-life alignment steps">
+        <div class="step">
+          <span class="step-num">Step 1 · Box</span>
+          <strong>Match your physical box</strong>
+          <div class="box-size-fields">
+            <label>
+              Width (cm)
+              <input
+                id="box-width-cm"
+                type="number"
+                min="10"
+                max="2000"
+                step="1"
+              />
+            </label>
+            <label>
+              Depth (cm)
+              <input
+                id="box-depth-cm"
+                type="number"
+                min="10"
+                max="2000"
+                step="1"
+              />
+            </label>
+            <label>
+              Height (cm)
+              <input
+                id="box-height-cm"
+                type="number"
+                min="0"
+                max="2000"
+                step="1"
+              />
+            </label>
+          </div>
+          <p>Edit here or in Control — both stay in sync.</p>
+        </div>
+        <div class="step">
+          <span class="step-num">Step 2 · Project</span>
+          <strong>Send the feed to the lamp</strong>
+          <p>
+            Pick the projector’s display, then open. Electron places fullscreen
+            there; in a browser you may need to allow screen access once.
+          </p>
+          <div class="box-size-fields output-display-fields">
+            <label>
+              Projector display
+              <select id="output-display-select"></select>
+            </label>
+            <label class="checkbox-inline">
+              <input id="output-fullscreen" type="checkbox" checked />
+              Fullscreen on open
+            </label>
+          </div>
+          <div class="step-actions">
+            <button type="button" id="btn-open-output-step" class="primary">
+              Open on projector
+            </button>
+            <button type="button" id="btn-refresh-displays">
+              Refresh displays
+            </button>
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-num">Step 3 · Align</span>
+          <strong>Look at the real box</strong>
+          <p>
+            Drag TL / TR / BR / BL on the left feed until each handle sits on a
+            real corner.
+          </p>
+        </div>
+      </section>
+
+      <details class="advanced" id="advanced-panel">
+        <summary>Advanced — sweet-spot 3D, FOV, lamp aim helper</summary>
+        <div class="advanced-body">
+          <p class="advanced-note">
+            Use after the four corners already match the real box.
+          </p>
+          <label>
+            Style
+            <select id="mode-select">
+              <option value="projector">Map + keystone</option>
+              <option value="anamorphic">Anamorphic sweet-spot</option>
+            </select>
+          </label>
+          <label>
+            FOV
+            <input
+              id="fov-input"
+              type="number"
+              min="15"
+              max="90"
+              step="1"
+              value="40"
+              style="width: 4.2rem"
+            />
+          </label>
+          <label>
+            Face
+            <select id="face-select"></select>
+          </label>
+          <label>
+            Projector
+            <select id="projector-select"></select>
+          </label>
+          <label>
+            <input type="checkbox" id="toggle-lamp-helper" />
+            Show lamp aim helper
+          </label>
+        </div>
+      </details>
+
+      <div class="split">
+        <section class="pane" aria-label="Projector feed">
+          <div class="pane-head">
+            <div class="title-row">
+              <strong>Projector feed</strong>
+              <span class="hint">This is what the lamp should show</span>
+            </div>
+            <div class="align-callout">
+              TL / TR / BR / BL are the projection corners — drag them to stretch
+              or bend the map onto each real box corner.
+            </div>
+          </div>
+          <div class="pane-body map-output">
+            <div class="stage-frame">
+              <canvas id="output-canvas"></canvas>
+              <div id="output-handles" class="corner-handles"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="pane" aria-label="Box surface reference">
+          <div class="pane-head">
+            <div class="title-row">
+              <strong>What lands on the box</strong>
+              <span class="hint">Orbit reference — not a second projector</span>
+            </div>
+            <div class="hint">
+              Scroll zoom · right-drag orbit · this is the surface you are lining
+              up on the table
+            </div>
+          </div>
+          <div class="pane-body">
+            <canvas id="scene-canvas"></canvas>
+          </div>
+        </section>
+      </div>
+
+      <footer class="footer">
+        <span id="status">Waiting for Control…</span>
+        <span>H hide handles · R resync from Control</span>
+      </footer>
+    </div>
+    <script type="module" src="/src/mapping-window.js"></script>
+  </body>
+</html>
