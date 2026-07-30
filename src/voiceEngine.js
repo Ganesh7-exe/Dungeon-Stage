@@ -33,6 +33,10 @@ export class DungeonVoiceEngine {
     this.currentParams = { ...DEFAULT_VOICE_PARAMS };
     this._graphBuilt = false;
     this._nodes = [];
+    /** @type {MediaStream | null} */
+    this._micStream = null;
+    /** @type {MediaStreamAudioSourceNode | null} */
+    this._micSourceNode = null;
   }
 
   setStatus(text) {
@@ -58,7 +62,9 @@ export class DungeonVoiceEngine {
 
     const params = DEFAULT_VOICE_PARAMS;
 
-    this.mic = this.track(new Tone.UserMedia());
+    // Mic entry is a Gain — live MediaStreamSource connects here in startLive.
+    // Tone.UserMedia is avoided: it forces echoCancellation:false, which lets
+    // dry room/speaker voice sit beside the delayed FX and sound like "me then monster".
     this.micGain = this.track(new Tone.Gain(1));
     this.loopPlayer = this.track(new Tone.Player({ loop: true, autostart: false }));
     this.recorder = this.track(new Tone.Recorder());
@@ -80,7 +86,6 @@ export class DungeonVoiceEngine {
     );
     this.preBus = this.track(new Tone.Gain(1));
 
-    this.mic.connect(this.micGain);
     this.micGain.connect(this.inputBus);
     this.loopPlayer.connect(this.inputBus);
     this.inputBus.chain(this.highpass, this.gate, this.compressor, this.preBus);
@@ -89,14 +94,28 @@ export class DungeonVoiceEngine {
     // —— parallel voice layers ——
     this.mixBus = this.track(new Tone.Gain(1));
 
+    // Shared window keeps layers time-aligned; wet:1 blocks any dry passthrough.
+    const pitchWindow = 0.05;
     this.pitchBody = this.track(
-      new Tone.PitchShift({ pitch: 0, windowSize: 0.08, delayTime: 0, feedback: 0 })
+      new Tone.PitchShift({
+        pitch: 0,
+        windowSize: pitchWindow,
+        delayTime: 0,
+        feedback: 0,
+        wet: 1,
+      })
     );
     this.bodyGain = this.track(new Tone.Gain(1));
     this.preBus.chain(this.pitchBody, this.bodyGain, this.mixBus);
 
     this.pitchSub = this.track(
-      new Tone.PitchShift({ pitch: -12, windowSize: 0.1, delayTime: 0, feedback: 0 })
+      new Tone.PitchShift({
+        pitch: -12,
+        windowSize: pitchWindow,
+        delayTime: 0,
+        feedback: 0,
+        wet: 1,
+      })
     );
     this.subLowpass = this.track(
       new Tone.Filter({ type: "lowpass", frequency: 900, rolloff: -24 })
@@ -105,12 +124,18 @@ export class DungeonVoiceEngine {
     this.preBus.chain(this.pitchSub, this.subLowpass, this.subGain, this.mixBus);
 
     this.pitchDouble = this.track(
-      new Tone.PitchShift({ pitch: 0, windowSize: 0.09, delayTime: 0.012, feedback: 0 })
+      new Tone.PitchShift({
+        pitch: 0,
+        windowSize: pitchWindow,
+        delayTime: 0.012,
+        feedback: 0,
+        wet: 1,
+      })
     );
     this.doubleGain = this.track(new Tone.Gain(0));
     this.preBus.chain(this.pitchDouble, this.doubleGain, this.mixBus);
 
-    this.ringShifter = this.track(new Tone.FrequencyShifter(40));
+    this.ringShifter = this.track(new Tone.FrequencyShifter({ frequency: 40, wet: 1 }));
     this.ringBandpass = this.track(
       new Tone.Filter({ type: "bandpass", frequency: 1600, Q: 0.7 })
     );
@@ -195,6 +220,12 @@ export class DungeonVoiceEngine {
     this.limiter = this.track(new Tone.Limiter(-2));
     this.meter = this.track(new Tone.Meter({ channels: 1, normalRange: true }));
 
+    // Final tap before speakers — may later be rewired to an <audio> sink.
+    this.contextDestination = Tone.getDestination();
+    this._outputRoute = "context"; // "context" | "element"
+    this.sinkDestination = null;
+    this.sinkAudio = null;
+
     this.mixBus.chain(
       this.formantFilters[0],
       this.formantFilters[1],
@@ -211,11 +242,131 @@ export class DungeonVoiceEngine {
       this.outputGain,
       this.limiter,
       this.meter,
-      Tone.getDestination()
+      this.contextDestination
     );
 
     this._graphBuilt = true;
     this.ready = true;
+  }
+
+  _getRawAudioContext() {
+    return Tone.getContext()?.rawContext || null;
+  }
+
+  /** Prefer AudioContext.setSinkId; fall back to MediaStream → <audio>.setSinkId. */
+  _supportsContextSink() {
+    const audioContext = this._getRawAudioContext();
+    return typeof audioContext?.setSinkId === "function";
+  }
+
+  _supportsElementSink() {
+    return typeof HTMLAudioElement !== "undefined" &&
+      typeof HTMLAudioElement.prototype.setSinkId === "function";
+  }
+
+  async _useContextDestination() {
+    if (!this.meter) return;
+    if (this._outputRoute !== "context") {
+      this.meter.disconnect();
+      this.meter.connect(this.contextDestination);
+      this._outputRoute = "context";
+    }
+    // Restore master so filtered audio can reach speakers/headphones.
+    if (this.contextDestination?.volume) {
+      this.contextDestination.volume.value = 0;
+    }
+    if (this.sinkAudio) {
+      this.sinkAudio.pause();
+      this.sinkAudio.srcObject = null;
+    }
+  }
+
+  async _useElementSink() {
+    if (!this.meter) return;
+    const audioContext = this._getRawAudioContext();
+    if (!audioContext) {
+      throw new Error("Audio context not ready");
+    }
+
+    if (!this.sinkDestination) {
+      this.sinkDestination = audioContext.createMediaStreamDestination();
+    }
+    if (!this.sinkAudio) {
+      this.sinkAudio = new Audio();
+      this.sinkAudio.autoplay = true;
+      this.sinkAudio.setAttribute("playsinline", "");
+    }
+
+    if (this._outputRoute !== "element") {
+      this.meter.disconnect();
+      this.meter.connect(this.sinkDestination);
+      this._outputRoute = "element";
+    }
+
+    // Silence Tone's master so only the sink <audio> plays (no double monitor).
+    if (this.contextDestination?.volume) {
+      this.contextDestination.volume.value = -Infinity;
+    }
+
+    this.sinkAudio.srcObject = this.sinkDestination.stream;
+    try {
+      await this.sinkAudio.play();
+    } catch {
+      // Autoplay can wait until the next user gesture; graph is still wired.
+    }
+  }
+
+  _closeMicStream() {
+    if (this._micSourceNode) {
+      try {
+        this._micSourceNode.disconnect();
+      } catch {
+        // already disconnected
+      }
+      this._micSourceNode = null;
+    }
+    if (this._micStream) {
+      for (const track of this._micStream.getTracks()) {
+        track.stop();
+      }
+      this._micStream = null;
+    }
+  }
+
+  async _openMicStream(deviceId = "") {
+    this._closeMicStream();
+    await this.ensureGraph();
+
+    const audioContext = this._getRawAudioContext();
+    if (!audioContext) {
+      throw new Error("Audio context not ready");
+    }
+
+    const baseAudio = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: false,
+      channelCount: 1,
+    };
+
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: deviceId
+          ? { ...baseAudio, deviceId: { exact: deviceId } }
+          : baseAudio,
+      });
+    } catch (error) {
+      if (!deviceId) throw error;
+      stream = await navigator.mediaDevices.getUserMedia({ audio: baseAudio });
+      this.setStatus(
+        `Mic opened (default) — selected device failed: ${error.message}`
+      );
+    }
+
+    this._micStream = stream;
+    this._micSourceNode = audioContext.createMediaStreamSource(stream);
+    Tone.connect(this._micSourceNode, this.micGain);
   }
 
   applyParams(params) {
@@ -224,10 +375,17 @@ export class DungeonVoiceEngine {
     if (!this._graphBuilt) return resolved;
 
     const pitch = clamp(resolved.pitch, -12, 12);
+    const pitchWindow = Math.abs(pitch) >= 5 ? 0.06 : 0.05;
     this.pitchBody.pitch = pitch;
-    this.pitchBody.windowSize = Math.abs(pitch) >= 5 ? 0.1 : 0.08;
+    this.pitchBody.windowSize = pitchWindow;
+    this.pitchBody.wet.value = 1;
     this.pitchSub.pitch = pitch - 12;
+    this.pitchSub.windowSize = pitchWindow;
+    this.pitchSub.wet.value = 1;
     this.pitchDouble.pitch = pitch + 0.12;
+    this.pitchDouble.windowSize = pitchWindow;
+    this.pitchDouble.wet.value = 1;
+    this.ringShifter.wet.value = 1;
 
     const subAmount = clamp(resolved.sub, 0, 1);
     const doubleAmount = clamp(resolved.detune, 0, 1);
@@ -306,33 +464,20 @@ export class DungeonVoiceEngine {
 
   async startLive(deviceId = "") {
     await this.ensureGraph();
-    const openOptions = deviceId ? { deviceId: { exact: deviceId } } : undefined;
-    try {
-      if (this.mic.state === "started") {
-        await this.mic.close();
-      }
-      await this.mic.open(openOptions);
-    } catch (error) {
-      await this.mic.open();
-      if (deviceId) {
-        this.setStatus(
-          `Mic opened (default) — selected device failed: ${error.message}`
-        );
-      }
-    }
+    await this._openMicStream(deviceId);
     this.live = true;
+    if (this.micGain) this.micGain.gain.value = this.looping ? 0 : 1;
     this.applyParams(this.currentParams);
     this.setStatus(
       this.muted
-        ? "Live (muted) — unmute to hear FX"
-        : "Live — speak clearly (headphones)"
+        ? "Live (muted) — unmute to hear filtered voice"
+        : "Live · filtered only — use headphones (disable Windows mic Listen-to-device)"
     );
   }
 
   async stopLive() {
-    if (this.mic && this.mic.state === "started") {
-      await this.mic.close();
-    }
+    this.stopLoop();
+    this._closeMicStream();
     this.live = false;
     this.setStatus("Voice engine stopped");
   }
@@ -341,10 +486,16 @@ export class DungeonVoiceEngine {
   async recordLoop(seconds = 3) {
     await this.ensureGraph();
     if (!this.live) {
-      await this.startLive(this.currentParams.inputDeviceId || "");
+      await this.startLive("");
     }
     this.stopLoop();
     this.recording = true;
+
+    // Mute speakers while capturing so live FX isn't heard beside your dry voice.
+    const wasMuted = this.muted;
+    const previousGain = this.outputGain?.gain.value ?? 1;
+    if (this.outputGain) this.outputGain.gain.value = 0;
+
     this.setStatus(`Recording ${seconds}s — speak your line now…`);
     this.recorder.start();
 
@@ -352,6 +503,11 @@ export class DungeonVoiceEngine {
 
     const blob = await this.recorder.stop();
     this.recording = false;
+
+    if (this.outputGain) {
+      this.outputGain.gain.value = wasMuted ? 0 : previousGain;
+    }
+
     const url = URL.createObjectURL(blob);
     try {
       const buffer = await new Tone.ToneAudioBuffer().load(url);
@@ -359,7 +515,7 @@ export class DungeonVoiceEngine {
       this.micGain.gain.value = 0;
       this.loopPlayer.start();
       this.looping = true;
-      this.setStatus("Looping your phrase — tweak sliders to compare");
+      this.setStatus("Looping filtered voice — tweak sliders (live mic muted)");
     } catch (error) {
       this.setStatus(`Loop failed: ${error.message}`);
     } finally {
@@ -374,7 +530,11 @@ export class DungeonVoiceEngine {
     if (this.micGain) this.micGain.gain.value = 1;
     if (this.looping) {
       this.looping = false;
-      this.setStatus("Loop stopped — mic live again");
+      this.setStatus(
+        this.live
+          ? "Loop stopped — mic live again (filtered only)"
+          : "Loop stopped"
+      );
     }
   }
 
@@ -388,7 +548,7 @@ export class DungeonVoiceEngine {
       this.muted
         ? "Muted"
         : this.live
-          ? "Live — speak clearly (headphones)"
+          ? "Live · filtered only — use headphones"
           : this.statusText
     );
   }
@@ -412,25 +572,73 @@ export class DungeonVoiceEngine {
 
   async setOutputDevice(deviceId) {
     await this.ensureGraph();
-    const context = Tone.getContext().rawContext;
-    if (typeof context.setSinkId !== "function") {
-      throw new Error("This browser cannot route to a custom output device");
+    const sinkId = deviceId || "";
+    const errors = [];
+
+    // 1) Native Web Audio routing (Chrome/Edge 110+)
+    if (this._supportsContextSink()) {
+      try {
+        await this._useContextDestination();
+        await this._getRawAudioContext().setSinkId(sinkId);
+        this.setStatus(
+          sinkId
+            ? "Output routed (use CABLE Input for Discord via VB-Cable)"
+            : "Output · default device"
+        );
+        return;
+      } catch (error) {
+        errors.push(error?.message || String(error));
+      }
     }
-    await context.setSinkId(deviceId || "");
-    this.setStatus(
-      deviceId
-        ? "Output routed (use CABLE Input for Discord via VB-Cable)"
-        : "Output · default device"
-    );
+
+    // 2) Wider support: stream FX into a hidden <audio> and setSinkId there
+    if (this._supportsElementSink()) {
+      try {
+        await this._useElementSink();
+        await this.sinkAudio.setSinkId(sinkId);
+        this.setStatus(
+          sinkId
+            ? "Output routed (use CABLE Input for Discord via VB-Cable)"
+            : "Output · default device"
+        );
+        return;
+      } catch (error) {
+        errors.push(error?.message || String(error));
+      }
+    }
+
+    // 3) Keep Voice Lab alive on system default speakers/headphones
+    await this._useContextDestination().catch(() => {});
+    if (sinkId) {
+      const detail = errors.length ? ` (${errors[0]})` : "";
+      this.setStatus(
+        `Custom output unavailable${detail} — using system default. Prefer Chrome/Edge, or set Windows default playback to VB-Cable.`
+      );
+      return;
+    }
+    this.setStatus("Output · default device");
   }
 
   dispose() {
+    this._closeMicStream();
+    if (this.sinkAudio) {
+      this.sinkAudio.pause();
+      this.sinkAudio.srcObject = null;
+      this.sinkAudio = null;
+    }
+    this.sinkDestination = null;
+    if (this.contextDestination?.volume) {
+      this.contextDestination.volume.value = 0;
+    }
+    this.contextDestination = null;
+    this._outputRoute = "context";
     for (const node of this._nodes) {
       node.dispose?.();
     }
     this._nodes = [];
     this._graphBuilt = false;
     this.ready = false;
+    this.live = false;
   }
 }
 

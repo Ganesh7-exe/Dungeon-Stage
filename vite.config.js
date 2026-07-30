@@ -7,6 +7,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, "index.html"),
         stage: resolve(__dirname, "stage.html"),
+        mapping: resolve(__dirname, "mapping.html"),
       },
     },
   },

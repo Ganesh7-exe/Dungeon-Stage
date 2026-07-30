@@ -4,11 +4,12 @@
   "productName": "Dungeon Stage",
   "copyright": "Copyright © Dungeon Stage",
   "directories": {
-    "output": "C:/Users/studd/AppData/Local/DungeonStageBuild/release-v3",
+    "output": "C:/Users/studd/AppData/Local/DungeonStageBuild/release-v8",
     "buildResources": "electron/build"
   },
   "files": [
     "electron/main.cjs",
+    "electron/preload.cjs",
     "package.json"
   ],
   "extraResources": [

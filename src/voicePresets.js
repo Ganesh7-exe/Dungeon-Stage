@@ -757,16 +757,8 @@ export const voicePresets = [
 ];
 
 export const defaultVoiceByCharacterId = {
-  dragon: "chromatic-dragons",
-  demon: "demons",
-  ogre: "ogres",
-  cyclops: "giants",
-  yeti: "yeti",
-  beholder: "beholders",
-  lich: "liches",
-  skeleton: "skeletons",
-  bat: "bats",
-  wolf: "wolves",
+  "shadow-demon": "demons",
+  spider: "elementals",
 };
 
 export function getVoicePresetById(presetId) {

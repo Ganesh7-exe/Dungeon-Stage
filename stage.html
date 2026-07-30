@@ -5,74 +5,523 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dungeon Stage · Projector</title>
     <style>
+      :root {
+        --hud: #121821;
+        --line: #2a3544;
+        --text: #d7dde8;
+        --muted: #8b96a8;
+        --accent: #d4a017;
+        --danger: #c45a5a;
+      }
+
       html,
       body {
         margin: 0;
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background: #000;
-        cursor: none;
-      }
-      body.calibrating {
+        background: #07090d;
+        color: var(--text);
+        font: 12px/1.4 "Segoe UI", system-ui, sans-serif;
         cursor: crosshair;
       }
-      #stage-wrap {
+
+      body.cursor-idle,
+      body.cursor-idle * {
+        cursor: none !important;
+      }
+
+      body.cursor-idle #proj-hotbar,
+      body.cursor-idle #proj-hotbar * {
+        cursor: pointer !important;
+      }
+
+      #viewport {
         position: relative;
         width: 100%;
         height: 100%;
+        /* Visible so TL/TR/BR/BL can travel past the frame edge while keystoning. */
+        overflow: visible;
+        background:
+          radial-gradient(circle at center, #141a22 0%, #07090d 70%);
       }
+
+      #stage-board {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 100%;
+        height: 100%;
+        transform: translate(-50%, -50%);
+        transform-origin: center center;
+        will-change: transform;
+        background: #000;
+        box-shadow: 0 0 0 1px rgba(212, 160, 23, 0.28);
+        overflow: visible;
+      }
+
       canvas {
         display: block;
         width: 100%;
         height: 100%;
       }
-      #status {
-        position: fixed;
-        left: 12px;
-        bottom: 10px;
-        color: #9aa4b2;
-        font: 12px/1.4 "Segoe UI", sans-serif;
-        pointer-events: none;
-        opacity: 0.9;
-        transition: opacity 0.4s ease;
-        z-index: 5;
-        max-width: min(90vw, 520px);
-      }
+
       .corner-handles {
         position: absolute;
         inset: 0;
         z-index: 4;
+        overflow: visible;
+        /* Must not steal right-drag / middle-pan from the 3D camera. */
+        pointer-events: none;
+        transition: opacity 180ms ease;
       }
+
       .corner-handles.hidden {
         display: none;
       }
+
+      body.presenting .corner-handles {
+        opacity: 0;
+        pointer-events: none;
+      }
+
       .corner-handle {
         position: absolute;
-        width: 28px;
-        height: 28px;
-        margin: -14px 0 0 -14px;
+        width: 36px;
+        height: 36px;
+        margin: -18px 0 0 -18px;
         border-radius: 999px;
-        border: 2px solid #d4a017;
-        background: rgba(20, 24, 32, 0.9);
+        border: 2px solid var(--accent);
+        background: rgba(20, 24, 32, 0.95);
         color: #f5d67b;
-        font: 700 10px/28px "Segoe UI", sans-serif;
+        font: 700 10px/36px "Segoe UI", sans-serif;
         text-align: center;
         cursor: grab;
         user-select: none;
         touch-action: none;
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45);
+        z-index: 14;
+        pointer-events: auto;
       }
+
       .corner-handle:active {
         cursor: grabbing;
+      }
+
+      .corner-handle.is-parked {
+        border-style: dashed;
+        opacity: 0.9;
+      }
+
+      .corner-handle[data-layer="map"],
+      .corner-handle[data-layer="stage"] {
+        width: 40px;
+        height: 40px;
+        margin: -20px 0 0 -20px;
+        font: 700 9px/40px "Segoe UI", sans-serif;
+        border-radius: 10px;
+      }
+
+      #proj-hotbar {
+        position: fixed;
+        left: 14px;
+        bottom: 14px;
+        z-index: 12;
+        display: flex;
+        align-items: flex-end;
+        gap: 0.45rem;
+        max-width: calc(100vw - 28px);
+        pointer-events: none;
+      }
+
+      #proj-hotbar > * {
+        pointer-events: auto;
+      }
+
+      .hotbar-eye {
+        flex: 0 0 auto;
+        width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: rgba(18, 24, 33, 0.94);
+        color: var(--accent);
+        cursor: pointer;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+        transition:
+          border-color 140ms ease,
+          background 140ms ease,
+          transform 140ms ease;
+      }
+
+      .hotbar-eye:hover,
+      .hotbar-eye:focus-visible {
+        border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+        background: rgba(34, 28, 14, 0.96);
+        outline: none;
+      }
+
+      .hotbar-eye svg {
+        width: 20px;
+        height: 20px;
+        display: block;
+      }
+
+      .hotbar-eye .icon-eye-off {
+        display: none;
+      }
+
+      body.presenting .hotbar-eye .icon-eye-on {
+        display: none;
+      }
+
+      body.presenting .hotbar-eye .icon-eye-off {
+        display: block;
+      }
+
+      body.presenting .hotbar-eye {
+        border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+        opacity: 0.72;
+      }
+
+      body.presenting .hotbar-eye:hover,
+      body.presenting .hotbar-eye:focus-visible {
+        opacity: 1;
+      }
+
+      .hotbar-panel {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.4rem 0.45rem;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: rgba(18, 24, 33, 0.94);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+        transition:
+          opacity 160ms ease,
+          transform 160ms ease;
+      }
+
+      body.presenting .hotbar-panel,
+      body.presenting #status {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(6px);
+      }
+
+      #proj-hotbar button:not(.hotbar-eye) {
+        background: #182131;
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 0.35rem 0.55rem;
+        font: inherit;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      #proj-hotbar button:not(.hotbar-eye):hover,
+      #proj-hotbar button:not(.hotbar-eye):focus-visible {
+        border-color: #4a5a70;
+        outline: none;
+      }
+
+      #proj-hotbar button.accent {
+        background: #2a2110;
+        border-color: #6b5318;
+        color: #f0d58a;
+      }
+
+      #proj-hotbar button.danger {
+        background: #2a1616;
+        border-color: #6b3030;
+        color: #f0b0b0;
+      }
+
+      #proj-hotbar button.danger:hover {
+        border-color: var(--danger);
+      }
+
+      #proj-hotbar button.is-active {
+        border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+        color: #f0d58a;
+      }
+
+      .zoom-readout {
+        min-width: 3.2rem;
+        text-align: center;
+        color: var(--accent);
+        font-variant-numeric: tabular-nums;
+        padding: 0 0.15rem;
+      }
+
+      .hotbar-hint {
+        color: var(--muted);
+        font-size: 0.72rem;
+        padding: 0 0.3rem;
+      }
+
+      .stage-box-handles {
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+        overflow: visible;
+        pointer-events: none;
+      }
+
+      .stage-box-handles.hidden {
+        display: none;
+      }
+
+      .stage-box-handle {
+        position: absolute;
+        width: 28px;
+        height: 28px;
+        margin: -14px 0 0 -14px;
+        border-radius: 6px;
+        border: 2px solid rgba(212, 160, 23, 0.95);
+        background: rgba(20, 24, 32, 0.92);
+        color: #f0d58a;
+        font: 700 11px/28px "Segoe UI", sans-serif;
+        text-align: center;
+        cursor: nwse-resize;
+        user-select: none;
+        touch-action: none;
+        pointer-events: auto;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 2px 10px rgba(0, 0, 0, 0.35);
+        z-index: 15;
+      }
+
+      .stage-box-handle[data-corner="ne"],
+      .stage-box-handle[data-corner="sw"] {
+        cursor: nesw-resize;
+      }
+
+      .stage-box-handle.is-dragging {
+        border-color: #ffe08a;
+        background: rgba(42, 33, 16, 0.96);
+        transform: scale(1.12);
+      }
+
+      .stage-box-handle.is-hidden {
+        display: none;
+      }
+
+      .stage-size-readout {
+        min-width: 2.6rem;
+        text-align: center;
+        color: var(--accent);
+        font-variant-numeric: tabular-nums;
+        padding: 0 0.1rem;
+      }
+
+      .hotbar-divider {
+        width: 1px;
+        align-self: stretch;
+        margin: 0.15rem 0.1rem;
+        background: var(--line);
+      }
+
+      .cast-select-group {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        flex: 0 1 auto;
+        min-width: 0;
+      }
+
+      .cast-select-label {
+        color: var(--muted);
+        font-size: 0.68rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      #proj-hotbar select.cast-select {
+        appearance: none;
+        -webkit-appearance: none;
+        background: #182131
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238b96a8' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E")
+          no-repeat right 0.45rem center / 8px;
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 0.35rem 1.4rem 0.35rem 0.55rem;
+        font: inherit;
+        cursor: pointer;
+        max-width: min(190px, 28vw);
+        min-width: 7.5rem;
+      }
+
+      #proj-hotbar select.cast-select:hover,
+      #proj-hotbar select.cast-select:focus-visible {
+        border-color: #4a5a70;
+        outline: none;
+      }
+
+      #proj-hotbar select.cast-select:focus-visible {
+        border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+        color: #f0d58a;
+      }
+
+      #status {
+        position: fixed;
+        left: 50%;
+        bottom: 18px;
+        transform: translateX(-50%);
+        color: var(--muted);
+        pointer-events: none;
+        opacity: 0.95;
+        transition: opacity 0.4s ease;
+        z-index: 5;
+        max-width: min(70vw, 520px);
+        text-align: center;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
       }
     </style>
   </head>
   <body class="calibrating">
-    <div id="stage-wrap">
-      <canvas id="stage-canvas"></canvas>
-      <div id="stage-handles" class="corner-handles"></div>
+    <div id="viewport">
+      <div id="stage-board">
+        <canvas id="stage-canvas"></canvas>
+        <div id="stage-handles" class="corner-handles"></div>
+        <div
+          id="character-stage-handles"
+          class="stage-box-handles hidden"
+          aria-label="3D stage resize handles"
+        ></div>
+      </div>
     </div>
-    <div id="status">Waiting for Control… H hide · F fullscreen · G grid · B guide · R resync</div>
+
+    <div id="proj-hotbar" aria-label="Projection hotbar">
+      <button
+        type="button"
+        id="btn-chrome-toggle"
+        class="hotbar-eye"
+        title="Hide controls (eye). Press again to show."
+        aria-label="Hide or show projection controls"
+        aria-pressed="false"
+      >
+        <svg class="icon-eye-on" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M12 5c5.5 0 9.7 4.1 10.8 7-1.1 2.9-5.3 7-10.8 7S2.3 14.9 1.2 12C2.3 9.1 6.5 5 12 5zm0 2.2c-3.9 0-7.2 2.9-8.4 4.8 1.2 1.9 4.5 4.8 8.4 4.8s7.2-2.9 8.4-4.8C19.2 10.1 15.9 7.2 12 7.2zm0 1.6a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4z"
+          />
+        </svg>
+        <svg class="icon-eye-off" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M3.3 2.2 21 19.9l-1.4 1.4-3.1-3.1A12.6 12.6 0 0 1 12 19c-5.5 0-9.7-4.1-10.8-7a13.7 13.7 0 0 1 4.5-5.3L1.9 3.6 3.3 2.2zm5 6.4 1.6 1.6a3.2 3.2 0 0 0 4.2 4.2l1.6 1.6A5.1 5.1 0 0 1 8.3 8.6zM12 5c1.4 0 2.7.3 3.9.7l-1.6 1.6A5.1 5.1 0 0 0 8.7 13L7 11.3A12 12 0 0 1 12 5zm8.6 2.2 1.5 1.5A13.5 13.5 0 0 1 22.8 12c-1.1 2.9-5.3 7-10.8 7-.8 0-1.5-.1-2.2-.2l1.7-1.7c.2 0 .3.1.5.1 3.9 0 7.2-2.9 8.4-4.8-.5-.8-1.4-1.9-2.6-2.9z"
+          />
+        </svg>
+      </button>
+
+      <div class="hotbar-panel" id="hotbar-panel">
+        <button type="button" id="btn-zoom-out" title="Zoom out (−)">−</button>
+        <span class="zoom-readout" id="zoom-readout">100%</span>
+        <button type="button" id="btn-zoom-in" title="Zoom in (+)">+</button>
+        <button type="button" id="btn-zoom-fit" title="Fit handles (0)">Fit</button>
+        <button type="button" id="btn-zoom-reset" title="Reset board zoom (Home)">1:1</button>
+        <button
+          type="button"
+          id="btn-view-mode"
+          title="Toggle 3D tilt view / flat top-down fill. Top fills the throw with no black bars."
+        >
+          Top
+        </button>
+        <span class="hotbar-divider" aria-hidden="true"></span>
+        <button type="button" id="btn-handles-toggle" title="Toggle corner handles (H)">
+          Handles
+        </button>
+        <button
+          type="button"
+          id="btn-keystone-layer"
+          title="Cycle keystone handles: All · Map (TL1) · 3D stage (TL2)"
+        >
+          Keystone: All
+        </button>
+        <button type="button" id="btn-grid-toggle" title="Calibration grid (G)">Grid</button>
+        <button
+          type="button"
+          id="btn-backdrop-toggle"
+          title="Gray backdrop outside warp — off is pure black for projection (D)"
+        >
+          Backdrop
+        </button>
+        <button type="button" id="btn-reset-corners" title="Reset corners to full rectangle">
+          Reset
+        </button>
+        <span class="hotbar-divider" aria-hidden="true"></span>
+        <label class="cast-select-group" title="Swap battle map — keeps map + 3D stage keystone">
+          <span class="cast-select-label">Map</span>
+          <select
+            id="cast-map-select"
+            class="cast-select"
+            aria-label="Battle map"
+          ></select>
+        </label>
+        <label class="cast-select-group" title="Replace the single 3D stage character">
+          <span class="cast-select-label">Char</span>
+          <select
+            id="cast-character-select"
+            class="cast-select"
+            aria-label="3D stage character"
+          ></select>
+        </label>
+        <button
+          type="button"
+          id="btn-stage-size-down"
+          title="Shrink 3D character stage"
+        >
+          3D−
+        </button>
+        <span class="stage-size-readout" id="stage-size-readout" title="3D stage size">—</span>
+        <button
+          type="button"
+          id="btn-stage-size-up"
+          title="Grow 3D character stage"
+        >
+          3D+
+        </button>
+        <span class="hotbar-divider" aria-hidden="true"></span>
+        <button
+          type="button"
+          class="accent"
+          id="btn-fullscreen"
+          title="Enter or leave fullscreen (F)"
+        >
+          Fullscreen
+        </button>
+        <button
+          type="button"
+          class="danger"
+          id="btn-exit-fullscreen"
+          title="Leave fullscreen (Esc). Works in the packaged app too."
+        >
+          Exit full
+        </button>
+        <button
+          type="button"
+          class="danger"
+          id="btn-close-stage"
+          title="Close this projection window"
+        >
+          Close
+        </button>
+        <span class="hotbar-hint">TL1 map corners · TL2 booth keystone · Reset · Scroll zoom</span>
+      </div>
+    </div>
+
+    <div id="status">
+      Waiting for Control… Eye hides UI · F fullscreen · Esc exit full
+    </div>
     <script type="module" src="/src/stage-window.js"></script>
   </body>
 </html>

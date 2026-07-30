@@ -1,10 +1,8 @@
-Quaternius — Cute Animated Monsters (CC0)
+Character assets for Dungeon Stage.
+
+Shadow Demon / Giant Spider: drop your own .glb files as
+Shadow_Demon.glb and Giant_Spider.glb (see README.md).
+
+Older Quaternius Cute Animated Monsters (CC0) pack models were removed
+from this fork to keep the roster lean.
 https://opengameart.org/content/textured-cute-monster-pack
-Converted OBJ+PNG → GLB for Dungeon Stage.
-
-Included: dragon, demon, ogre, cyclops, yeti, beholder (cthulhu),
-lich (ghost), skeleton (skull), bat, wolf (deer/stag).
-
-For a more “premium / cinematic” look beyond free stylized packs:
-buy/download higher-poly CC or paid models from Sketchfab, or generate
-with Meshy/Tripo, then drop .glb files into this folder using the same names.

@@ -1,17 +1,27 @@
 # Character models
 
-## Included now (Quaternius, CC0)
-From OpenGameArt *Animated Monster Pack*:
-- `dragon.glb`
-- `skeleton.glb`
-- `bat.glb`
-- `slime.glb`
+Put every `.glb` you want in the roster in this folder:
 
-## Also present
-- `fox_sample.glb` / `duck_sample.glb` — Khronos sample models (testing)
+```
+public/characters/
+```
+
+Filenames must match `src/characters.js`.
+
+## Current roster
+
+| File in this folder | Character in Creature kit | Extra |
+|---|---|---|
+| `Giant_Spider.glb` | Giant Spider | Looping fire aura |
+| `Shadow_Demon.glb` | Shadow Demon | Matte void-black look |
+
+## Editing .glb files
+
+True mesh/sculpt edits need Blender. This app can still change looks without rewriting the binary:
+
+- `look: "void-black"` — crush materials to near-black (Shadow Demon)
+- `fx: "fire"` — attach a looping fire particle aura (Spider)
 
 ## Missing slots → procedural
-If `ogre.glb`, `goblin.glb`, etc. are missing, the app builds a simple 3D stand-in automatically.
 
-## Upgrade look
-Download CC0 `.glb` from Sketchfab / Poly Pizza / Quaternius and drop here using the filenames in `src/characters.js`.
+If a listed `.glb` is missing and a procedural stand-in exists (e.g. spider), the app builds a simple 3D stand-in automatically.

@@ -1,7 +1,7 @@
 {
   "name": "dungeon-stage",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.5.1",
   "description": "Dungeon Stage — project 3D monsters onto a box for D&D",
   "author": "Dungeon Stage",
   "type": "module",

@@ -127,11 +127,24 @@ export function initVoiceLab(options) {
   }
 
   async function fillDeviceSelects() {
+    let permissionStream = null;
     try {
-      // Permission unlocks device labels
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Permission unlocks device labels — stop immediately so it can't linger.
+      permissionStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: false,
+        },
+      });
     } catch {
       // continue with unlabeled devices
+    } finally {
+      if (permissionStream) {
+        for (const track of permissionStream.getTracks()) {
+          track.stop();
+        }
+      }
     }
 
     const inputs = await dungeonVoiceEngine.listInputDevices();
@@ -245,13 +258,8 @@ export function initVoiceLab(options) {
     try {
       const current = ensureVoiceLabState();
       await dungeonVoiceEngine.startLive(current.inputDeviceId || "");
-      if (current.outputDeviceId) {
-        try {
-          await dungeonVoiceEngine.setOutputDevice(current.outputDeviceId);
-        } catch (error) {
-          setStatus(`Output route failed: ${error.message}`);
-        }
-      }
+      // Always apply saved output ("" = system default). Never block mic on route miss.
+      await dungeonVoiceEngine.setOutputDevice(current.outputDeviceId || "");
       applyCurrentSliders();
       startMeter();
     } catch (error) {
@@ -270,6 +278,11 @@ export function initVoiceLab(options) {
     .getElementById("voice-loop-record")
     ?.addEventListener("click", async () => {
       try {
+        const current = ensureVoiceLabState();
+        if (!dungeonVoiceEngine.live) {
+          await dungeonVoiceEngine.startLive(current.inputDeviceId || "");
+          await dungeonVoiceEngine.setOutputDevice(current.outputDeviceId || "");
+        }
         startMeter();
         await dungeonVoiceEngine.recordLoop(3);
         applyCurrentSliders();
@@ -326,7 +339,9 @@ export function initVoiceLab(options) {
     try {
       await dungeonVoiceEngine.setOutputDevice(labState.outputDeviceId || "");
     } catch (error) {
-      setStatus(`Output route failed: ${error.message}`);
+      setStatus(
+        `Output unchanged — ${error.message}. Voice still uses system default.`
+      );
     }
   });
 
