@@ -6,13 +6,17 @@ import {
   createDefaultSceneState,
   buildActorsForSync,
   clampProjectorCorners,
-  characterCatalog,
   setSoleActorOnMap,
 } from "./sceneState.js";
 import {
-  battleMapCategories,
+  getBattleMapCategories,
+  initCustomBattleMaps,
   normalizeBattleMapState,
 } from "./battleMaps.js";
+import { getCharacterCategories } from "./characters.js";
+import { initCustomCharacters } from "./customCharacters.js";
+import { CUSTOM_MAPS_SYNC_KEY } from "./customBattleMaps.js";
+import { CUSTOM_CHARACTERS_SYNC_KEY } from "./customCharacters.js";
 import { normalizeCharacterStageState, MIN_SIZE, MAX_SIZE } from "./characterStage.js";
 import {
   areFaceCornersHealthy,
@@ -379,37 +383,66 @@ function restoreProjectionAlignment(snapshot) {
   }
 }
 
-function ensureCastSelectOptions() {
-  if (castMapSelect && castMapSelect.options.length === 0) {
-    for (const category of battleMapCategories) {
-      const group = document.createElement("optgroup");
-      group.label = category.name;
+async function rebuildCastMapSelectOptions() {
+  if (!castMapSelect) return;
+  await initCustomBattleMaps();
+  castMapSelect.innerHTML = "";
+  for (const category of getBattleMapCategories()) {
+    const group = document.createElement("optgroup");
+    group.label = category.name;
+    if (category.isCustomCategory && category.maps.length === 0) {
+      const placeholderOption = document.createElement("option");
+      placeholderOption.disabled = true;
+      placeholderOption.value = "";
+      placeholderOption.textContent = "Add custom maps from Home";
+      group.appendChild(placeholderOption);
+    } else {
       for (const mapEntry of category.maps) {
         const option = document.createElement("option");
         option.value = mapEntry.id;
         option.textContent = mapEntry.name;
         group.appendChild(option);
       }
-      castMapSelect.appendChild(group);
     }
-  }
-
-  if (castCharacterSelect && castCharacterSelect.options.length === 0) {
-    const noneOption = document.createElement("option");
-    noneOption.value = "";
-    noneOption.textContent = "None";
-    castCharacterSelect.appendChild(noneOption);
-    for (const character of characterCatalog) {
-      const option = document.createElement("option");
-      option.value = character.id;
-      option.textContent = character.name;
-      castCharacterSelect.appendChild(option);
-    }
+    castMapSelect.appendChild(group);
   }
 }
 
-function syncCastSelectsFromState() {
-  ensureCastSelectOptions();
+async function rebuildCastCharacterSelectOptions() {
+  if (!castCharacterSelect) return;
+  await initCustomCharacters();
+  castCharacterSelect.innerHTML = "";
+
+  const noneOption = document.createElement("option");
+  noneOption.value = "";
+  noneOption.textContent = "None";
+  castCharacterSelect.appendChild(noneOption);
+
+  for (const category of getCharacterCategories()) {
+    const group = document.createElement("optgroup");
+    group.label = category.name;
+    const categoryCharacters = category.characters || [];
+    if (category.isCustomCategory && categoryCharacters.length === 0) {
+      const placeholderOption = document.createElement("option");
+      placeholderOption.disabled = true;
+      placeholderOption.value = "";
+      placeholderOption.textContent = "Add custom characters from Home";
+      group.appendChild(placeholderOption);
+    } else {
+      for (const character of categoryCharacters) {
+        const option = document.createElement("option");
+        option.value = character.id;
+        option.textContent = character.name;
+        group.appendChild(option);
+      }
+    }
+    castCharacterSelect.appendChild(group);
+  }
+}
+
+async function refreshCastSelectsFromState() {
+  await rebuildCastMapSelectOptions();
+  await rebuildCastCharacterSelectOptions();
   suppressCastSelectEvents = true;
   try {
     if (castMapSelect) {
@@ -424,6 +457,10 @@ function syncCastSelectsFromState() {
   } finally {
     suppressCastSelectEvents = false;
   }
+}
+
+function syncCastSelectsFromState() {
+  void refreshCastSelectsFromState();
 }
 
 async function applyCastBattleMap(mapId) {
@@ -463,7 +500,7 @@ async function applyCastBattleMap(mapId) {
   }
   broadcastStageContentUpdate({ includeAlignment: true });
 
-  const mapEntry = battleMapCategories
+  const mapEntry = getBattleMapCategories()
     .flatMap((category) => category.maps)
     .find((entry) => entry.id === nextBattleMap.mapId);
   setStatus(
@@ -1807,6 +1844,18 @@ async function applyCommand(command) {
       syncHotbarToggles();
       return;
     }
+    if (command.type === "custom-maps-changed") {
+      await initCustomBattleMaps(true);
+      state.battleMap = normalizeBattleMapState(state.battleMap);
+      await renderer.setBattleMap(state.battleMap);
+      await refreshCastSelectsFromState();
+      return;
+    }
+    if (command.type === "custom-characters-changed") {
+      await initCustomCharacters(true);
+      await refreshCastSelectsFromState();
+      return;
+    }
   } catch (error) {
     console.warn("Stage command failed", error);
     setStatus(`Stage error: ${error.message || "unknown"}`);
@@ -1823,6 +1872,14 @@ channel.addEventListener("message", (event) => {
 });
 
 window.addEventListener("storage", (event) => {
+  if (event.key === CUSTOM_MAPS_SYNC_KEY) {
+    void initCustomBattleMaps(true).then(() => refreshCastSelectsFromState());
+    return;
+  }
+  if (event.key === CUSTOM_CHARACTERS_SYNC_KEY) {
+    void initCustomCharacters(true).then(() => refreshCastSelectsFromState());
+    return;
+  }
   if (event.key !== "dungeon-stage-command" || !event.newValue) return;
   try {
     applyCommand(JSON.parse(event.newValue));
@@ -2094,7 +2151,7 @@ castCharacterSelect?.addEventListener("change", () => {
 
 applyViewTransform();
 syncHotbarToggles();
-syncCastSelectsFromState();
+void refreshCastSelectsFromState();
 ensureCharacterStageHandles();
 startCharacterStageHandleLoop();
 refreshFullscreenButtons();
@@ -2139,10 +2196,23 @@ for (const projector of startup.venue.projectors || []) {
 }
 // Boot from LS without persisting — Home may have just flushed a newer map;
 // announceReady pulls that sync-scene before we write LS again.
-applyScene(startup, { persist: false })
-  .catch(() => applyScene(createDefaultSceneState(), { persist: false }))
+initCustomBattleMaps()
+  .catch((error) => {
+    console.warn("Custom battle maps failed to load", error);
+  })
+  .finally(() =>
+    initCustomCharacters().catch((error) => {
+      console.warn("Custom characters failed to load", error);
+    })
+  )
   .finally(() => {
-    announceReady();
-    window.setTimeout(announceReady, 300);
-    window.setTimeout(announceReady, 1000);
+    state.battleMap = normalizeBattleMapState(state.battleMap);
+    startup.battleMap = normalizeBattleMapState(startup.battleMap);
+    applyScene(startup, { persist: false })
+      .catch(() => applyScene(createDefaultSceneState(), { persist: false }))
+      .finally(() => {
+        announceReady();
+        window.setTimeout(announceReady, 300);
+        window.setTimeout(announceReady, 1000);
+      });
   });

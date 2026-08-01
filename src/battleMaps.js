@@ -13,6 +13,14 @@
  */
 
 import { normalizeStageFxState } from "./fx/stageFxState.js";
+import {
+  getCustomBattleMapEntries,
+  getCustomMapsCategory,
+  initCustomBattleMaps,
+  isCustomBattleMapId,
+} from "./customBattleMaps.js";
+
+export { initCustomBattleMaps, isCustomBattleMapId } from "./customBattleMaps.js";
 
 export const battleMapCategories = [
   {
@@ -234,7 +242,19 @@ export const battleMaps = battleMapCategories.flatMap(
   (category) => category.maps
 );
 
+/** Built-in categories plus the user Custom Maps section. */
+export function getBattleMapCategories() {
+  return [...battleMapCategories, getCustomMapsCategory()];
+}
+
+export function getAllBattleMaps() {
+  return [...battleMaps, ...getCustomBattleMapEntries()];
+}
+
 export function getBattleMapById(mapId) {
+  const customEntry = getCustomBattleMapEntries().find((entry) => entry.id === mapId);
+  if (customEntry) return customEntry;
+
   return (
     battleMaps.find((entry) => entry.id === mapId) ||
     battleMaps.find((entry) => entry.id === "none")
@@ -269,7 +289,7 @@ export function createDefaultBattleMapState() {
 
 export function normalizeBattleMapState(raw = {}) {
   const fallback = createDefaultBattleMapState();
-  const knownMap = battleMaps.find((entry) => entry.id === raw.mapId);
+  const knownMap = getAllBattleMaps().find((entry) => entry.id === raw.mapId);
   const mapId = knownMap ? knownMap.id : fallback.mapId;
   const intensity = Number(raw.intensity);
   return {

@@ -1,4 +1,7 @@
-import { characters as characterCatalog } from "./characters.js";
+import {
+  getCharacterCatalog,
+  getCharacterById as resolveCharacterById,
+} from "./characters.js";
 import {
   createDefaultBattleMapState,
   normalizeBattleMapState,
@@ -78,10 +81,11 @@ export function createInstanceId() {
 }
 
 export function getCharacterById(characterId) {
-  return characterCatalog.find((character) => character.id === characterId) || null;
+  return resolveCharacterById(characterId);
 }
 
 export function getCharacterByIndex(index) {
+  const characterCatalog = getCharacterCatalog();
   if (!characterCatalog.length) return null;
   const safeIndex =
     ((index % characterCatalog.length) + characterCatalog.length) %
@@ -90,6 +94,7 @@ export function getCharacterByIndex(index) {
 }
 
 export function createActorInstance(characterId, overrides = {}) {
+  const characterCatalog = getCharacterCatalog();
   const character = getCharacterById(characterId) || characterCatalog[0];
   if (!character) return null;
   const scale = Number(overrides.scale);
@@ -230,7 +235,7 @@ export function getFocusedCharacter(state) {
     if (instance) {
       const character = getCharacterById(instance.characterId);
       if (character) {
-        const index = characterCatalog.findIndex(
+        const index = getCharacterCatalog().findIndex(
           (entry) => entry.id === character.id
         );
         return { ...character, index: Math.max(0, index) };
@@ -376,7 +381,7 @@ export function addActorToMap(state, characterId, options = {}) {
   if (!instance) return null;
   state.actorsOnMap = [...(state.actorsOnMap || []), instance];
   state.selectedInstanceIds = [instance.instanceId];
-  const catalogIndex = characterCatalog.findIndex(
+  const catalogIndex = getCharacterCatalog().findIndex(
     (character) => character.id === instance.characterId
   );
   if (catalogIndex >= 0) state.characterIndex = catalogIndex;
@@ -403,6 +408,22 @@ export function removeOneActorOfType(state, characterId) {
   state.actorsOnMap = list.filter((_, index) => index !== lastIndex);
   state.selectedInstanceIds = (state.selectedInstanceIds || []).filter(
     (id) => id !== removed.instanceId
+  );
+  return true;
+}
+
+export function removeAllActorsOfType(state, characterId) {
+  const removedIds = new Set(
+    (state.actorsOnMap || [])
+      .filter((instance) => instance.characterId === characterId)
+      .map((instance) => instance.instanceId)
+  );
+  if (!removedIds.size) return false;
+  state.actorsOnMap = (state.actorsOnMap || []).filter(
+    (instance) => instance.characterId !== characterId
+  );
+  state.selectedInstanceIds = (state.selectedInstanceIds || []).filter(
+    (instanceId) => !removedIds.has(instanceId)
   );
   return true;
 }
@@ -445,7 +466,8 @@ export function loadSceneState() {
       ...parsed,
       characterIndex:
         Number.isFinite(characterIndex) && characterIndex >= 0
-          ? Math.floor(characterIndex) % Math.max(characterCatalog.length, 1)
+          ? Math.floor(characterIndex) %
+            Math.max(getCharacterCatalog().length, 1)
           : fallback.characterIndex,
       placementMode:
         parsed.placementMode === "move" || parsed.placementMode === "fit"
@@ -595,7 +617,7 @@ export function cloneSceneState(state) {
 }
 
 export {
-  characterCatalog,
+  getCharacterCatalog,
   STORAGE_KEY,
   BOX_HALF_EXTENT,
   MAX_ELEVATION,

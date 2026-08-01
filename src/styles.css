@@ -469,9 +469,16 @@ body.is-resizing-rails * {
 }
 
 .map-thumb {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.map-thumb-select {
   display: grid;
   grid-template-rows: auto auto;
   gap: 0.35rem;
+  width: 100%;
   padding: 0.35rem;
   margin: 0;
   border: 1px solid var(--line);
@@ -487,18 +494,19 @@ body.is-resizing-rails * {
     transform 140ms ease;
 }
 
-.map-thumb:hover {
+.map-thumb-select:hover {
   border-color: #3d4b5f;
   background: #1a222e;
 }
 
-.map-thumb.is-selected {
+.map-thumb.is-selected .map-thumb-select,
+.map-thumb-select.is-selected {
   border-color: color-mix(in srgb, var(--accent) 75%, #3d4b5f);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
   background: #1c2430;
 }
 
-.map-thumb img,
+.map-thumb-select img,
 .map-thumb-empty {
   display: block;
   width: 100%;
@@ -527,8 +535,129 @@ body.is-resizing-rails * {
   padding: 0 0.1rem 0.1rem;
 }
 
-.map-thumb.is-selected .map-thumb-label {
+.map-thumb.is-selected .map-thumb-label,
+.map-thumb-select.is-selected .map-thumb-label {
   color: var(--accent);
+}
+
+.map-category--custom .map-category-title {
+  color: var(--text);
+}
+
+.map-category-hint {
+  margin: 0;
+  padding: 0 0.1rem;
+  font-size: 0.62rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.custom-map-add-button {
+  justify-self: start;
+  margin: 0.1rem 0 0.15rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.custom-map-add-button:hover {
+  border-color: var(--accent);
+  background: rgba(96, 165, 250, 0.08);
+}
+
+.map-thumb-media {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.map-thumb-remove {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  z-index: 3;
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  border-radius: 999px;
+  background: rgba(12, 16, 22, 0.82);
+  color: #f5d0d0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.map-thumb-remove:hover {
+  background: rgba(180, 48, 48, 0.92);
+  color: #fff;
+}
+
+.confirm-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.confirm-dialog {
+  width: min(100%, 22rem);
+  padding: 1rem 1rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+}
+
+.confirm-dialog-message {
+  margin: 0 0 0.9rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.confirm-dialog-button {
+  min-width: 5.5rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.confirm-dialog-button--cancel {
+  background: #151b24;
+  color: var(--text);
+}
+
+.confirm-dialog-button--cancel:hover {
+  background: #1c2430;
+}
+
+.confirm-dialog-button--confirm {
+  border-color: color-mix(in srgb, #b83030 60%, var(--line));
+  background: #8f2626;
+  color: #fff;
+}
+
+.confirm-dialog-button--confirm:hover {
+  background: #a82e2e;
 }
 
 .btn-row,
@@ -883,6 +1012,44 @@ button.primary:hover {
 
 .qty-btn.qty-remove {
   color: #d7b4b4;
+}
+
+.custom-characters-section {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.custom-characters-title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.custom-characters-hint {
+  margin: 0;
+  font-size: 0.62rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.custom-character-list {
+  margin-top: 0.15rem;
+}
+
+.character-list-item--custom {
+  position: relative;
+  grid-template-columns: 1fr auto auto auto auto;
+  padding-right: 2rem;
+}
+
+.character-list-item--custom .character-kit-remove {
+  top: 50%;
+  right: 0.45rem;
+  transform: translateY(-50%);
 }
 
 .selection-marquee {

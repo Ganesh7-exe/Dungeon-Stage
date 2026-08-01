@@ -7,22 +7,34 @@ import {
   createDefaultSceneState,
   buildActiveActor,
   buildActorsForSync,
-  characterCatalog,
+  getCharacterCatalog,
   getCharacterByIndex,
   getFocusedCharacter,
   getActorInstance,
   addActorToMap,
   removeActorFromMap,
   removeOneActorOfType,
+  removeAllActorsOfType,
   clampPlacementAxis,
   clampElevation,
   clampRotation,
   clampProjectorCorners,
 } from "./sceneState.js";
 import {
-  battleMapCategories,
+  getBattleMapCategories,
+  initCustomBattleMaps,
   normalizeBattleMapState,
 } from "./battleMaps.js";
+import {
+  addCustomBattleMapFromFile,
+  removeCustomBattleMap,
+} from "./customBattleMaps.js";
+import {
+  initCustomCharacters,
+  addCustomCharacterFromFile,
+  removeCustomCharacter,
+} from "./customCharacters.js";
+import { getCharacterCategories } from "./characters.js";
 import { voicemodClient } from "./voicemodClient.js";
 import { initVoiceLab } from "./voiceLabUi.js";
 import { getProjectorById, normalizeVenueState, resetFaceCornersToFullFrame } from "./venueGeometry.js";
@@ -31,6 +43,7 @@ import { createVenuePanel } from "./ui/venuePanel.js";
 import { createStageFxPanel } from "./ui/stageFxPanel.js";
 import { createCharacterStagePanel } from "./ui/characterStagePanel.js";
 import { initRailResize } from "./ui/railResize.js";
+import { confirmRemoveMap } from "./ui/confirmDialog.js";
 import { openProjectorOutputWindow } from "./displayOutput.js";
 import { normalizeCharacterStageState } from "./characterStage.js";
 
@@ -38,6 +51,7 @@ const channel = new BroadcastChannel("dungeon-stage");
 
 const characterNameElement = document.getElementById("character-name");
 const characterListElement = document.getElementById("character-list");
+let customCharactersSectionElement = null;
 const onMapRosterElement = document.getElementById("on-map-roster");
 const onMapEmptyElement = document.getElementById("on-map-empty");
 const onMapCountElement = document.getElementById("on-map-count");
@@ -147,7 +161,7 @@ function setSelection(instanceIds, options = {}) {
   if (options.syncFocus !== false && next[0]) {
     const instance = getActorInstance(state, next[0]);
     if (instance) {
-      const catalogIndex = characterCatalog.findIndex(
+      const catalogIndex = getCharacterCatalog().findIndex(
         (character) => character.id === instance.characterId
       );
       if (catalogIndex >= 0) state.characterIndex = catalogIndex;
@@ -247,6 +261,24 @@ function handleStageMessage(command) {
     }
     return;
   }
+  if (command.type === "custom-maps-changed") {
+    initCustomBattleMaps(true).then(() => {
+      const mapSelect = document.getElementById("battle-map-select");
+      const selectedMapId = mapSelect?.value || state.battleMap?.mapId;
+      document.getElementById("battle-map-thumbs")?.dispatchEvent(
+        new CustomEvent("dungeon-stage:refresh-map-thumbs", {
+          detail: { selectedMapId },
+        })
+      );
+    });
+    return;
+  }
+  if (command.type === "custom-characters-changed") {
+    initCustomCharacters(true).then(() => {
+      renderCharacterList();
+    });
+    return;
+  }
   if (command.type === "stage-content-updated") {
     stageLastSeenAt = Date.now();
     if (command.battleMap) {
@@ -258,10 +290,12 @@ function handleStageMessage(command) {
       document
         .getElementById("battle-map-thumbs")
         ?.querySelectorAll(".map-thumb")
-        .forEach((button) => {
-          const selected = button.dataset.mapId === state.battleMap.mapId;
-          button.classList.toggle("is-selected", selected);
-          button.setAttribute("aria-selected", selected ? "true" : "false");
+        .forEach((thumb) => {
+          const selected = thumb.dataset.mapId === state.battleMap.mapId;
+          thumb.classList.toggle("is-selected", selected);
+          const selectButton = thumb.querySelector(".map-thumb-select");
+          selectButton?.classList.toggle("is-selected", selected);
+          selectButton?.setAttribute("aria-selected", selected ? "true" : "false");
         });
     }
     if (Array.isArray(command.actorsOnMap)) {
@@ -496,7 +530,7 @@ function renderOnMapRoster() {
 
   actors.forEach((instance, index) => {
     const character =
-      characterCatalog.find((entry) => entry.id === instance.characterId) ||
+      getCharacterCatalog().find((entry) => entry.id === instance.characterId) ||
       null;
     const row = document.createElement("li");
     row.className = "roster-row";
@@ -548,71 +582,210 @@ function renderOnMapRoster() {
   });
 }
 
-function renderCharacterList() {
-  characterListElement.innerHTML = "";
-  characterCatalog.forEach((character, index) => {
-    const item = document.createElement("li");
-    if (index === state.characterIndex) item.classList.add("active");
+function ensureCustomCharactersSection() {
+  if (customCharactersSectionElement?.isConnected) {
+    return customCharactersSectionElement;
+  }
+  if (!characterListElement?.parentElement) return null;
 
-    const nameButton = document.createElement("button");
-    nameButton.type = "button";
-    nameButton.className = "kit-name";
-    nameButton.textContent = `${index + 1}. ${character.name}`;
-    nameButton.addEventListener("click", async () => {
-      state.characterIndex = index;
-      renderPlacementControls();
-      await voiceLab.applyForCharacter(
-        getCharacterByIndex(state.characterIndex),
-        "select"
+  customCharactersSectionElement = document.createElement("div");
+  customCharactersSectionElement.id = "custom-characters-section";
+  customCharactersSectionElement.className = "custom-characters-section";
+  characterListElement.insertAdjacentElement("afterend", customCharactersSectionElement);
+  return customCharactersSectionElement;
+}
+
+let customCharacterFileInput = null;
+
+function getCustomCharacterFileInput() {
+  if (customCharacterFileInput) return customCharacterFileInput;
+  customCharacterFileInput = document.createElement("input");
+  customCharacterFileInput.type = "file";
+  customCharacterFileInput.accept = "model/gltf-binary,.glb";
+  customCharacterFileInput.hidden = true;
+  customCharacterFileInput.addEventListener("change", async () => {
+    const selectedFile = customCharacterFileInput.files?.[0];
+    customCharacterFileInput.value = "";
+    if (!selectedFile) return;
+
+    try {
+      const addedEntry = await addCustomCharacterFromFile(selectedFile);
+      if (!addedEntry) return;
+      const catalogIndex = getCharacterCatalog().findIndex(
+        (character) => character.id === addedEntry.id
       );
-      if (state.voicemod.autoApplyOnSelect) {
-        await applyCurrentVoice("select");
+      if (catalogIndex >= 0) {
+        state.characterIndex = catalogIndex;
       }
-      scheduleAutosave();
-    });
-
-    const count = document.createElement("span");
-    count.className = "kit-count";
-    const onMapCount = countActorsByCharacterId(character.id);
-    count.textContent = onMapCount > 0 ? String(onMapCount) : "";
-
-    const addButton = document.createElement("button");
-    addButton.type = "button";
-    addButton.className = "qty-btn";
-    addButton.title = `Add ${character.name} to map`;
-    addButton.setAttribute("aria-label", `Add ${character.name}`);
-    addButton.textContent = "+";
-    addButton.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      state.characterIndex = index;
-      addActorToMap(state, character.id);
-      setSelection(state.selectedInstanceIds);
+      renderCharacterList();
+      broadcastCustomCharactersChanged();
       await syncScene({ immediate: true });
-      await voiceLab.applyForCharacter(getFocusedCharacter(state), "select");
-      if (state.voicemod.autoApplyOnSelect) {
-        await applyCurrentVoice("select");
-      }
-      previewStatus.textContent = `${character.name} added to map`;
-    });
-
-    const removeButton = document.createElement("button");
-    removeButton.type = "button";
-    removeButton.className = "qty-btn qty-remove";
-    removeButton.title = `Remove one ${character.name}`;
-    removeButton.setAttribute("aria-label", `Remove one ${character.name}`);
-    removeButton.textContent = "−";
-    removeButton.disabled = onMapCount === 0;
-    removeButton.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      if (!removeOneActorOfType(state, character.id)) return;
-      setSelection(state.selectedInstanceIds);
-      await syncScene({ immediate: true });
-      previewStatus.textContent = `${character.name} removed`;
-    });
-
-    item.append(nameButton, count, addButton, removeButton);
-    characterListElement.appendChild(item);
+      previewStatus.textContent = `Added custom character · ${addedEntry.name}`;
+    } catch (error) {
+      window.alert(error.message || "Could not add custom character.");
+    }
   });
+  document.body.appendChild(customCharacterFileInput);
+  return customCharacterFileInput;
+}
+
+function createCharacterKitRow(character, index, options = {}) {
+  const { removable = false } = options;
+  const item = document.createElement("li");
+  if (index === state.characterIndex) item.classList.add("active");
+  if (removable) {
+    item.classList.add("character-list-item--custom");
+  }
+
+  const nameButton = document.createElement("button");
+  nameButton.type = "button";
+  nameButton.className = "kit-name";
+  nameButton.textContent = `${index + 1}. ${character.name}`;
+  nameButton.addEventListener("click", async () => {
+    state.characterIndex = index;
+    renderCharacterList();
+    renderPlacementControls();
+    await voiceLab.applyForCharacter(
+      getCharacterByIndex(state.characterIndex),
+      "select"
+    );
+    if (state.voicemod.autoApplyOnSelect) {
+      await applyCurrentVoice("select");
+    }
+    scheduleAutosave();
+  });
+
+  const count = document.createElement("span");
+  count.className = "kit-count";
+  const onMapCount = countActorsByCharacterId(character.id);
+  count.textContent = onMapCount > 0 ? String(onMapCount) : "";
+
+  const addButton = document.createElement("button");
+  addButton.type = "button";
+  addButton.className = "qty-btn";
+  addButton.title = `Add ${character.name} to map`;
+  addButton.setAttribute("aria-label", `Add ${character.name}`);
+  addButton.textContent = "+";
+  addButton.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    state.characterIndex = index;
+    addActorToMap(state, character.id);
+    setSelection(state.selectedInstanceIds);
+    renderCharacterList();
+    await syncScene({ immediate: true });
+    await voiceLab.applyForCharacter(getFocusedCharacter(state), "select");
+    if (state.voicemod.autoApplyOnSelect) {
+      await applyCurrentVoice("select");
+    }
+    previewStatus.textContent = `${character.name} added to map`;
+  });
+
+  const removeButton = document.createElement("button");
+  removeButton.type = "button";
+  removeButton.className = "qty-btn qty-remove";
+  removeButton.title = `Remove one ${character.name}`;
+  removeButton.setAttribute("aria-label", `Remove one ${character.name}`);
+  removeButton.textContent = "−";
+  removeButton.disabled = onMapCount === 0;
+  removeButton.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    if (!removeOneActorOfType(state, character.id)) return;
+    setSelection(state.selectedInstanceIds);
+    renderCharacterList();
+    await syncScene({ immediate: true });
+    previewStatus.textContent = `${character.name} removed`;
+  });
+
+  item.append(nameButton, count, addButton, removeButton);
+
+  if (removable) {
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "character-kit-remove map-thumb-remove";
+    deleteButton.title = "Remove character";
+    deleteButton.setAttribute("aria-label", `Remove ${character.name}`);
+    deleteButton.textContent = "×";
+    deleteButton.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const confirmed = await confirmRemoveMap("Remove character?");
+      if (!confirmed) return;
+
+      removeAllActorsOfType(state, character.id);
+      await removeCustomCharacter(character.id);
+
+      const catalogLength = getCharacterCatalog().length;
+      if (catalogLength === 0) {
+        state.characterIndex = 0;
+      } else if (state.characterIndex >= catalogLength) {
+        state.characterIndex = catalogLength - 1;
+      }
+
+      renderCharacterList();
+      broadcastCustomCharactersChanged();
+      await syncScene({ immediate: true });
+      previewStatus.textContent = "Custom character removed";
+    });
+    item.appendChild(deleteButton);
+  }
+
+  return item;
+}
+
+function renderCharacterList() {
+  if (!characterListElement) return;
+
+  characterListElement.innerHTML = "";
+  const characterCatalog = getCharacterCatalog();
+  const builtInCount = getCharacterCategories()[0]?.characters?.length || 0;
+
+  for (let index = 0; index < builtInCount; index += 1) {
+    const character = characterCatalog[index];
+    if (!character) continue;
+    characterListElement.appendChild(createCharacterKitRow(character, index));
+  }
+
+  const customSection = ensureCustomCharactersSection();
+  if (!customSection) return;
+
+  customSection.innerHTML = "";
+  const customCategory = getCharacterCategories().find(
+    (category) => category.isCustomCategory
+  );
+  const customCharacters = customCategory?.characters || [];
+
+  const heading = document.createElement("h4");
+  heading.className = "custom-characters-title";
+  heading.textContent = customCategory?.name || "Custom Characters";
+  customSection.appendChild(heading);
+
+  const hint = document.createElement("p");
+  hint.className = "custom-characters-hint";
+  hint.textContent = "GLB format only.";
+  customSection.appendChild(hint);
+
+  const addButton = document.createElement("button");
+  addButton.type = "button";
+  addButton.className = "custom-map-add-button";
+  addButton.textContent = "Add character…";
+  addButton.addEventListener("click", () => {
+    getCustomCharacterFileInput().click();
+  });
+  customSection.appendChild(addButton);
+
+  const customList = document.createElement("ul");
+  customList.className = "character-list custom-character-list";
+  customList.setAttribute("aria-label", "Custom characters");
+
+  customCharacters.forEach((character, customIndex) => {
+    const catalogIndex = builtInCount + customIndex;
+    customList.appendChild(
+      createCharacterKitRow(character, catalogIndex, { removable: true })
+    );
+  });
+
+  customSection.appendChild(customList);
 }
 
 function isCharacterStageEnabled() {
@@ -1386,6 +1559,7 @@ async function syncScene(options = {}) {
 
 async function setCharacterIndex(index) {
   state.characterIndex = index;
+  renderCharacterList();
   renderPlacementControls();
   await voiceLab.applyForCharacter(
     getCharacterByIndex(state.characterIndex),
@@ -1690,14 +1864,15 @@ document
   });
 
 document.getElementById("prev").addEventListener("click", async () => {
+  const catalogLength = getCharacterCatalog().length;
   const nextIndex =
-    (state.characterIndex - 1 + characterCatalog.length) %
-    characterCatalog.length;
+    (state.characterIndex - 1 + catalogLength) % catalogLength;
   await setCharacterIndex(nextIndex);
 });
 
 document.getElementById("next").addEventListener("click", async () => {
-  const nextIndex = (state.characterIndex + 1) % characterCatalog.length;
+  const catalogLength = getCharacterCatalog().length;
+  const nextIndex = (state.characterIndex + 1) % catalogLength;
   await setCharacterIndex(nextIndex);
 });
 
@@ -1723,6 +1898,38 @@ document.getElementById("preview-warp").addEventListener("change", async () => {
   await syncScene();
 });
 
+function broadcastCustomMapsChanged() {
+  const payload = { type: "custom-maps-changed", at: Date.now() };
+  try {
+    channel.postMessage(payload);
+  } catch (error) {
+    console.warn("BroadcastChannel failed", error);
+  }
+  if (stageWindow && !stageWindow.closed) {
+    try {
+      stageWindow.postMessage(payload, window.location.origin);
+    } catch (error) {
+      console.warn("postMessage to Stage failed", error);
+    }
+  }
+}
+
+function broadcastCustomCharactersChanged() {
+  const payload = { type: "custom-characters-changed", at: Date.now() };
+  try {
+    channel.postMessage(payload);
+  } catch (error) {
+    console.warn("BroadcastChannel failed", error);
+  }
+  if (stageWindow && !stageWindow.closed) {
+    try {
+      stageWindow.postMessage(payload, window.location.origin);
+    } catch (error) {
+      console.warn("postMessage to Stage failed", error);
+    }
+  }
+}
+
 function ensureBattleMapControls() {
   const enabledInput = document.getElementById("battle-map-enabled");
   const mapSelect = document.getElementById("battle-map-select");
@@ -1736,66 +1943,177 @@ function ensureBattleMapControls() {
   const intensityOut = document.getElementById("battle-map-intensity-out");
   if (!enabledInput || !mapSelect || !thumbGrid) return;
 
+  let customMapFileInput = null;
+
+  function getCustomMapFileInput() {
+    if (customMapFileInput) return customMapFileInput;
+    customMapFileInput = document.createElement("input");
+    customMapFileInput.type = "file";
+    customMapFileInput.accept = "image/png,image/jpeg,.png,.jpg,.jpeg";
+    customMapFileInput.hidden = true;
+    customMapFileInput.addEventListener("change", async () => {
+      const selectedFile = customMapFileInput.files?.[0];
+      customMapFileInput.value = "";
+      if (!selectedFile) return;
+
+      try {
+        const addedEntry = await addCustomBattleMapFromFile(selectedFile);
+        if (!addedEntry) return;
+        state.battleMap = selectBattleMap(addedEntry);
+        mapSelect.value = state.battleMap.mapId;
+        enabledInput.checked = true;
+        renderBattleMapThumbs(state.battleMap.mapId);
+        broadcastCustomMapsChanged();
+        await syncScene({ immediate: true });
+        previewStatus.textContent = `Added custom map · ${addedEntry.name}`;
+      } catch (error) {
+        window.alert(error.message || "Could not add custom map.");
+      }
+    });
+    document.body.appendChild(customMapFileInput);
+    return customMapFileInput;
+  }
+
+  function selectBattleMap(mapEntry) {
+    mapSelect.value = mapEntry.id;
+    if (mapEntry.id === "none") {
+      enabledInput.checked = false;
+    } else if (!enabledInput.checked) {
+      enabledInput.checked = true;
+    }
+    return normalizeBattleMapState({
+      ...state.battleMap,
+      mapId: mapEntry.id,
+      enabled: mapEntry.id !== "none" && enabledInput.checked,
+    });
+  }
+
   function createMapThumbButton(mapEntry, selectedMapId) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "map-thumb";
-    button.setAttribute("role", "option");
-    button.dataset.mapId = mapEntry.id;
-    button.setAttribute(
+    const wrapper = document.createElement("div");
+    wrapper.className = "map-thumb";
+    if (mapEntry.custom) {
+      wrapper.classList.add("map-thumb--custom");
+    }
+    wrapper.dataset.mapId = mapEntry.id;
+
+    const selectButton = document.createElement("button");
+    selectButton.type = "button";
+    selectButton.className = "map-thumb-select";
+    selectButton.setAttribute("role", "option");
+    selectButton.setAttribute(
       "aria-selected",
       mapEntry.id === selectedMapId ? "true" : "false"
     );
-    button.title = mapEntry.name;
+    selectButton.title = mapEntry.name;
+
+    const media = document.createElement("span");
+    media.className = "map-thumb-media";
 
     if (mapEntry.thumb || mapEntry.file) {
       const image = document.createElement("img");
       image.src = mapEntry.thumb || mapEntry.file;
       image.alt = mapEntry.name;
       image.loading = "lazy";
-      button.appendChild(image);
+      media.appendChild(image);
     } else {
       const empty = document.createElement("span");
       empty.className = "map-thumb-empty";
       empty.textContent = "None";
-      button.appendChild(empty);
+      media.appendChild(empty);
     }
+
+    selectButton.appendChild(media);
 
     const label = document.createElement("span");
     label.className = "map-thumb-label";
     label.textContent = mapEntry.name;
-    button.appendChild(label);
+    selectButton.appendChild(label);
 
     if (mapEntry.id === selectedMapId) {
-      button.classList.add("is-selected");
+      wrapper.classList.add("is-selected");
+      selectButton.classList.add("is-selected");
     }
 
-    button.addEventListener("click", async () => {
-      mapSelect.value = mapEntry.id;
-      if (mapEntry.id === "none") {
-        enabledInput.checked = false;
-      } else if (!enabledInput.checked) {
-        enabledInput.checked = true;
-      }
-      renderBattleMapThumbs(mapEntry.id);
-      await commitBattleMap();
+    selectButton.addEventListener("click", async () => {
+      state.battleMap = selectBattleMap(mapEntry);
+      mapSelect.value = state.battleMap.mapId;
+      renderBattleMapThumbs(state.battleMap.mapId);
+      await syncScene({ immediate: true });
     });
 
-    return button;
+    wrapper.appendChild(selectButton);
+
+    if (mapEntry.custom) {
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "map-thumb-remove";
+      removeButton.title = "Remove map";
+      removeButton.setAttribute("aria-label", `Remove ${mapEntry.name}`);
+      removeButton.textContent = "×";
+      removeButton.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const confirmed = await confirmRemoveMap("Remove map?");
+        if (!confirmed) return;
+
+        const wasSelected = mapSelect.value === mapEntry.id;
+        await removeCustomBattleMap(mapEntry.id);
+
+        if (wasSelected) {
+          mapSelect.value = "village-of-barovia";
+          enabledInput.checked = true;
+          state.battleMap = normalizeBattleMapState({
+            ...state.battleMap,
+            mapId: "village-of-barovia",
+            enabled: true,
+          });
+        }
+
+        renderBattleMapThumbs(mapSelect.value);
+        broadcastCustomMapsChanged();
+        await syncScene({ immediate: true });
+        previewStatus.textContent = wasSelected
+          ? "Custom map removed · switched to Village of Barovia"
+          : "Custom map removed";
+      });
+      wrapper.appendChild(removeButton);
+    }
+
+    return wrapper;
   }
 
   function renderBattleMapThumbs(selectedMapId) {
     thumbGrid.innerHTML = "";
 
-    for (const category of battleMapCategories) {
+    for (const category of getBattleMapCategories()) {
       const section = document.createElement("section");
       section.className = "map-category";
+      if (category.isCustomCategory) {
+        section.classList.add("map-category--custom");
+      }
       section.dataset.categoryId = category.id;
 
       const heading = document.createElement("h4");
       heading.className = "map-category-title";
       heading.textContent = category.name;
       section.appendChild(heading);
+
+      if (category.isCustomCategory) {
+        const hint = document.createElement("p");
+        hint.className = "map-category-hint";
+        hint.textContent = "PNG and JPEG allowed.";
+        section.appendChild(hint);
+
+        const addButton = document.createElement("button");
+        addButton.type = "button";
+        addButton.className = "custom-map-add-button";
+        addButton.textContent = "Add map…";
+        addButton.addEventListener("click", () => {
+          getCustomMapFileInput().click();
+        });
+        section.appendChild(addButton);
+      }
 
       const grid = document.createElement("div");
       grid.className = "map-thumb-grid";
@@ -1810,6 +2128,12 @@ function ensureBattleMapControls() {
       thumbGrid.appendChild(section);
     }
   }
+
+  thumbGrid.addEventListener("dungeon-stage:refresh-map-thumbs", (event) => {
+    const selectedMapId =
+      event.detail?.selectedMapId || mapSelect.value || state.battleMap?.mapId;
+    renderBattleMapThumbs(selectedMapId);
+  });
 
   function writeBattleMapStateToUi() {
     const battleMap = normalizeBattleMapState(state.battleMap);
@@ -1851,7 +2175,51 @@ function ensureBattleMapControls() {
   });
 }
 
-ensureBattleMapControls();
+function readRawPersistedBattleMapId() {
+  try {
+    const stored = localStorage.getItem("dungeon-stage-scene-v3-single");
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    return parsed?.battleMap?.mapId || null;
+  } catch {
+    return null;
+  }
+}
+
+async function bootstrapCustomBattleMaps() {
+  try {
+    await initCustomBattleMaps();
+    const persistedMapId = readRawPersistedBattleMapId();
+    if (persistedMapId) {
+      const nextBattleMap = normalizeBattleMapState({
+        ...state.battleMap,
+        mapId: persistedMapId,
+      });
+      if (nextBattleMap.mapId !== state.battleMap.mapId) {
+        state.battleMap = nextBattleMap;
+      }
+    }
+    ensureBattleMapControls();
+    if (persistedMapId && state.battleMap.mapId === persistedMapId) {
+      await syncScene({ immediate: true });
+    }
+  } catch (error) {
+    console.warn("Custom battle maps failed to load", error);
+    ensureBattleMapControls();
+  }
+}
+
+async function bootstrapCustomCharacters() {
+  try {
+    await initCustomCharacters();
+    renderCharacterList();
+  } catch (error) {
+    console.warn("Custom characters failed to load", error);
+  }
+}
+
+bootstrapCustomBattleMaps();
+bootstrapCustomCharacters();
 
 const venuePanel = venuePanelMount
   ? createVenuePanel({
