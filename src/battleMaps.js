@@ -14,6 +14,10 @@
 
 import { normalizeStageFxState } from "./fx/stageFxState.js";
 import {
+  createDefaultMapRevealState,
+  normalizeMapRevealState,
+} from "./fogOfWar/mapRevealConfig.js";
+import {
   getCustomBattleMapEntries,
   getCustomMapsCategory,
   initCustomBattleMaps,
@@ -146,8 +150,10 @@ export const battleMapCategories = [
         id: "death-house-basement",
         name: "Death House",
         file: "/maps/death-house-basement.png",
+        layerDarkBase: "/maps/death-house-basement/layers/dark-base.png",
         thumb: "/maps/death-house-basement.png",
-        cacheKey: "user-v2",
+        cacheKey: "user-v20-black-interior",
+        mapLayers: true,
         effects: { water: 0, wind: 0, fire: 0, fog: 0, snow: 0 },
         stageFxOverrides: {
           bloomEnabled: false,
@@ -158,13 +164,16 @@ export const battleMapCategories = [
           saturation: 1,
           contrast: 1,
         },
+        fogOfWar: true,
       },
       {
         id: "death-house-dungeon-level",
         name: "Dungeon Level",
         file: "/maps/death-house-dungeon-level.png",
+        layerDarkBase: "/maps/death-house-dungeon-level/layers/dark-base.png",
         thumb: "/maps/death-house-dungeon-level.png",
-        cacheKey: "user-v2",
+        cacheKey: "user-v16-full-reveal-37",
+        mapLayers: true,
         effects: { water: 0, wind: 0, fire: 0, fog: 0, snow: 0 },
         stageFxOverrides: {
           bloomEnabled: false,
@@ -175,6 +184,7 @@ export const battleMapCategories = [
           saturation: 1,
           contrast: 1,
         },
+        fogOfWar: true,
       },
     ],
   },
@@ -261,6 +271,12 @@ export function getBattleMapById(mapId) {
   );
 }
 
+/** True when this map uses layered room reveal toggles. */
+export function battleMapSupportsMapReveal(mapId) {
+  const mapConfig = getBattleMapById(mapId);
+  return Boolean(mapConfig?.mapLayers && mapConfig?.fogOfWar);
+}
+
 /**
  * Merge global stage FX with optional per-map overrides (e.g. disable bloom on
  * bright indoor tile floors so the grid stays readable).
@@ -292,6 +308,11 @@ export function normalizeBattleMapState(raw = {}) {
   const knownMap = getAllBattleMaps().find((entry) => entry.id === raw.mapId);
   const mapId = knownMap ? knownMap.id : fallback.mapId;
   const intensity = Number(raw.intensity);
+  const supportsFogOfWar = battleMapSupportsMapReveal(mapId);
+  const fogOfWar = supportsFogOfWar
+    ? normalizeMapRevealState(raw.fogOfWar || createDefaultMapRevealState(), mapId)
+    : null;
+
   return {
     mapId,
     enabled: raw.enabled !== false,
@@ -304,5 +325,6 @@ export function normalizeBattleMapState(raw = {}) {
       Number.isFinite(intensity) && intensity >= 0
         ? Math.min(1.5, Math.max(0, intensity))
         : fallback.intensity,
+    fogOfWar,
   };
 }
