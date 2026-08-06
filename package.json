@@ -11,7 +11,11 @@
     "build": "vite build",
     "preview": "vite preview",
     "app:dev": "npm run build && electron .",
-    "app:exe": "npm run build && electron-builder --win portable --x64"
+    "app:exe": "npm run build && electron-builder --win portable --x64",
+    "generate-fow-masks": "node scripts/generate-death-house-fow-masks.mjs",
+    "generate-death-house-layers": "node scripts/generate-death-house-layers.mjs",
+    "generate-map-layers": "node scripts/generate-map-layers.mjs",
+    "generate-dungeon-level-layers": "node scripts/generate-map-layers.mjs death-house-dungeon-level"
   },
   "dependencies": {
     "three": "^0.172.0",
@@ -21,6 +25,7 @@
     "electron": "^35.2.1",
     "electron-builder": "^26.0.12",
     "obj2gltf": "^3.2.0",
+    "sharp": "^0.35.3",
     "vite": "^6.0.7"
   }
 }
