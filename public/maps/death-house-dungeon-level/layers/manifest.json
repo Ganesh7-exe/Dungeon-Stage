@@ -1,0 +1,53 @@
+{
+  "mapId": "death-house-dungeon-level",
+  "mapSize": {
+    "width": 714,
+    "height": 891
+  },
+  "cacheKey": "death-house-dungeon-level-1785453673610",
+  "alignment": null,
+  "interiorMaskSource": "map-only",
+  "darkBaseFile": "/maps/death-house-dungeon-level/layers/dark-base.png",
+  "sourceMapFile": "/maps/death-house-dungeon-level.png",
+  "regionIds": [
+    35,
+    36,
+    37
+  ],
+  "regions": [
+    {
+      "id": 35,
+      "label": "Room 35",
+      "cropFile": "/maps/death-house-dungeon-level/layers/crop-35.png",
+      "pixelCount": 81556,
+      "manual": true,
+      "placement": {
+        "offsetX": 12,
+        "offsetY": 2
+      }
+    },
+    {
+      "id": 36,
+      "label": "Room 36",
+      "cropFile": "/maps/death-house-dungeon-level/layers/crop-36.png",
+      "pixelCount": 47612,
+      "manual": true,
+      "placement": {
+        "offsetX": 78,
+        "offsetY": 262
+      }
+    },
+    {
+      "id": 37,
+      "label": "Room 37",
+      "cropFile": "/maps/death-house-dungeon-level/layers/crop-37.png",
+      "pixelCount": 145814,
+      "manual": true,
+      "placement": {
+        "offsetX": 235,
+        "offsetY": 208
+      }
+    }
+  ],
+  "fullRevealRegionId": 37
+}

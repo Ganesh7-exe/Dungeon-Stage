@@ -1,0 +1,71 @@
+{
+  "23": {
+    "sourceFile": "manual/crop-23-source.png",
+    "offsetX": 369,
+    "offsetY": 110,
+    "autoAlign": false,
+    "searchRegion": { "minX": 280, "maxX": 680, "minY": 80, "maxY": 750 }
+  },
+  "24": {
+    "sourceFile": "manual/crop-24-source.png",
+    "offsetX": 218,
+    "offsetY": 93,
+    "autoAlign": false,
+    "searchRegion": { "minX": 180, "maxX": 520, "minY": 40, "maxY": 380 }
+  },
+  "30": {
+    "sourceFile": "manual/crop-30-source.png",
+    "offsetX": 272,
+    "offsetY": 548,
+    "autoAlign": false,
+    "searchRegion": { "minX": 200, "maxX": 320, "minY": 400, "maxY": 600 }
+  },
+  "34": {
+    "sourceFile": "manual/crop-34-source.png",
+    "offsetX": 248,
+    "offsetY": 733,
+    "autoAlign": false,
+    "searchRegion": { "minX": 180, "maxX": 450, "minY": 650, "maxY": 850 }
+  },
+  "33": {
+    "sourceFile": "manual/crop-33-source.png",
+    "offsetX": 449,
+    "offsetY": 766,
+    "autoAlign": false,
+    "searchRegion": { "minX": 400, "maxX": 650, "minY": 650, "maxY": 850 }
+  },
+  "31": {
+    "sourceFile": "manual/crop-31-source.png",
+    "offsetX": 558,
+    "offsetY": 527,
+    "autoAlign": false,
+    "searchRegion": { "minX": 450, "maxX": 700, "minY": 400, "maxY": 750 }
+  },
+  "29": {
+    "sourceFile": "manual/crop-29-source.png",
+    "offsetX": 389,
+    "offsetY": 607,
+    "autoAlign": false,
+    "searchRegion": { "minX": 350, "maxX": 650, "minY": 350, "maxY": 650 }
+  },
+  "27": {
+    "sourceFile": "manual/crop-27-source.png",
+    "offsetX": 389,
+    "offsetY": 447,
+    "autoAlign": false,
+    "searchRegion": { "minX": 380, "maxX": 620, "minY": 320, "maxY": 580 }
+  },
+  "26": {
+    "sourceFile": "manual/crop-26-source.png",
+    "offsetX": 316,
+    "offsetY": 435,
+    "autoAlign": false,
+    "searchRegion": { "minX": 250, "maxX": 480, "minY": 280, "maxY": 650 }
+  },
+  "25": {
+    "sourceFile": "manual/crop-25-source.png",
+    "offsetX": 31,
+    "offsetY": 247,
+    "autoAlign": false
+  }
+}

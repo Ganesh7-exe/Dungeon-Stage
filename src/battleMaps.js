@@ -26,6 +26,29 @@ import {
 
 export { initCustomBattleMaps, isCustomBattleMapId } from "./customBattleMaps.js";
 
+/** Neutral grade for maps that should render as-is on the projector. */
+const neutralStageFxOverrides = {
+  bloomEnabled: false,
+  groundFogEnabled: false,
+  dustMotesEnabled: false,
+  embersEnabled: false,
+  exposure: 1,
+  saturation: 1,
+  contrast: 1,
+};
+
+/** Death House scans read very dark on the projector — lift grade, drop vignette/atmosphere. */
+const deathHouseStageFxOverrides = {
+  bloomEnabled: false,
+  groundFogEnabled: false,
+  dustMotesEnabled: false,
+  embersEnabled: false,
+  vignetteStrength: 0,
+  exposure: 1.45,
+  saturation: 1.08,
+  contrast: 1.08,
+};
+
 export const battleMapCategories = [
   {
     id: "utility",
@@ -51,15 +74,7 @@ export const battleMapCategories = [
         thumb: "/maps/village-of-barovia.png",
         cacheKey: "user-v1",
         effects: { water: 0, wind: 0, fire: 0, fog: 0, snow: 0 },
-        stageFxOverrides: {
-          bloomEnabled: false,
-          groundFogEnabled: false,
-          dustMotesEnabled: false,
-          embersEnabled: false,
-          exposure: 1,
-          saturation: 1,
-          contrast: 1,
-        },
+        stageFxOverrides: neutralStageFxOverrides,
       },
       {
         id: "death-house-front-view",
@@ -68,15 +83,7 @@ export const battleMapCategories = [
         thumb: "/maps/death-house-front-view.png",
         cacheKey: "user-v1",
         effects: { water: 0, wind: 0, fire: 0, fog: 0, snow: 0 },
-        stageFxOverrides: {
-          bloomEnabled: false,
-          groundFogEnabled: false,
-          dustMotesEnabled: false,
-          embersEnabled: false,
-          exposure: 1,
-          saturation: 1,
-          contrast: 1,
-        },
+        stageFxOverrides: deathHouseStageFxOverrides,
       },
       {
         id: "death-house-first-floor",
@@ -85,15 +92,7 @@ export const battleMapCategories = [
         thumb: "/maps/death-house-first-floor.png",
         cacheKey: "user-v2",
         effects: { water: 0, wind: 0, fire: 0, fog: 0, snow: 0 },
-        stageFxOverrides: {
-          bloomEnabled: false,
-          groundFogEnabled: false,
-          dustMotesEnabled: false,
-          embersEnabled: false,
-          exposure: 1,
-          saturation: 1,
-          contrast: 1,
-        },
+        stageFxOverrides: deathHouseStageFxOverrides,
       },
       {
         id: "death-house-second-floor",
@@ -102,15 +101,7 @@ export const battleMapCategories = [
         thumb: "/maps/death-house-second-floor.png",
         cacheKey: "user-v3",
         effects: { water: 0, wind: 0, fire: 0, fog: 0, snow: 0 },
-        stageFxOverrides: {
-          bloomEnabled: false,
-          groundFogEnabled: false,
-          dustMotesEnabled: false,
-          embersEnabled: false,
-          exposure: 1,
-          saturation: 1,
-          contrast: 1,
-        },
+        stageFxOverrides: deathHouseStageFxOverrides,
       },
       {
         id: "death-house-third-floor",
@@ -119,15 +110,7 @@ export const battleMapCategories = [
         thumb: "/maps/death-house-third-floor.png",
         cacheKey: "user-v2",
         effects: { water: 0, wind: 0, fire: 0, fog: 0, snow: 0 },
-        stageFxOverrides: {
-          bloomEnabled: false,
-          groundFogEnabled: false,
-          dustMotesEnabled: false,
-          embersEnabled: false,
-          exposure: 1,
-          saturation: 1,
-          contrast: 1,
-        },
+        stageFxOverrides: deathHouseStageFxOverrides,
       },
       {
         id: "death-house-attic",
@@ -136,15 +119,7 @@ export const battleMapCategories = [
         thumb: "/maps/death-house-attic.png",
         cacheKey: "user-v2",
         effects: { water: 0, wind: 0, fire: 0, fog: 0, snow: 0 },
-        stageFxOverrides: {
-          bloomEnabled: false,
-          groundFogEnabled: false,
-          dustMotesEnabled: false,
-          embersEnabled: false,
-          exposure: 1,
-          saturation: 1,
-          contrast: 1,
-        },
+        stageFxOverrides: deathHouseStageFxOverrides,
       },
       {
         id: "death-house-basement",
@@ -155,15 +130,7 @@ export const battleMapCategories = [
         cacheKey: "user-v20-black-interior",
         mapLayers: true,
         effects: { water: 0, wind: 0, fire: 0, fog: 0, snow: 0 },
-        stageFxOverrides: {
-          bloomEnabled: false,
-          groundFogEnabled: false,
-          dustMotesEnabled: false,
-          embersEnabled: false,
-          exposure: 1,
-          saturation: 1,
-          contrast: 1,
-        },
+        stageFxOverrides: deathHouseStageFxOverrides,
         fogOfWar: true,
       },
       {
@@ -175,15 +142,7 @@ export const battleMapCategories = [
         cacheKey: "user-v16-full-reveal-37",
         mapLayers: true,
         effects: { water: 0, wind: 0, fire: 0, fog: 0, snow: 0 },
-        stageFxOverrides: {
-          bloomEnabled: false,
-          groundFogEnabled: false,
-          dustMotesEnabled: false,
-          embersEnabled: false,
-          exposure: 1,
-          saturation: 1,
-          contrast: 1,
-        },
+        stageFxOverrides: deathHouseStageFxOverrides,
         fogOfWar: true,
       },
     ],
@@ -199,15 +158,7 @@ export const battleMapCategories = [
         thumb: "/maps/a-most-potent-brew-map-1.png",
         cacheKey: "user-v1",
         effects: { water: 0, wind: 0, fire: 0, fog: 0, snow: 0 },
-        stageFxOverrides: {
-          bloomEnabled: false,
-          groundFogEnabled: false,
-          dustMotesEnabled: false,
-          embersEnabled: false,
-          exposure: 1,
-          saturation: 1,
-          contrast: 1,
-        },
+        stageFxOverrides: neutralStageFxOverrides,
       },
       {
         id: "a-most-potent-brew-map-2",
@@ -216,15 +167,7 @@ export const battleMapCategories = [
         thumb: "/maps/a-most-potent-brew-map-2.png",
         cacheKey: "user-v1",
         effects: { water: 0, wind: 0, fire: 0, fog: 0, snow: 0 },
-        stageFxOverrides: {
-          bloomEnabled: false,
-          groundFogEnabled: false,
-          dustMotesEnabled: false,
-          embersEnabled: false,
-          exposure: 1,
-          saturation: 1,
-          contrast: 1,
-        },
+        stageFxOverrides: neutralStageFxOverrides,
       },
       {
         id: "a-most-potent-brew-map-3",
@@ -233,15 +176,7 @@ export const battleMapCategories = [
         thumb: "/maps/a-most-potent-brew-map-3.png",
         cacheKey: "user-v1",
         effects: { water: 0, wind: 0, fire: 0, fog: 0, snow: 0 },
-        stageFxOverrides: {
-          bloomEnabled: false,
-          groundFogEnabled: false,
-          dustMotesEnabled: false,
-          embersEnabled: false,
-          exposure: 1,
-          saturation: 1,
-          contrast: 1,
-        },
+        stageFxOverrides: neutralStageFxOverrides,
       },
     ],
   },

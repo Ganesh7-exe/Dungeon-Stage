@@ -1,0 +1,23 @@
+{
+  "35": {
+    "sourceFile": "manual/crop-35-source.png",
+    "offsetX": 12,
+    "offsetY": 2,
+    "autoAlign": false,
+    "searchRegion": { "minX": 0, "maxX": 400, "minY": 0, "maxY": 280 }
+  },
+  "37": {
+    "sourceFile": "manual/crop-37-source.png",
+    "offsetX": 235,
+    "offsetY": 208,
+    "autoAlign": false,
+    "searchRegion": { "minX": 150, "maxX": 400, "minY": 150, "maxY": 450 }
+  },
+  "36": {
+    "sourceFile": "manual/crop-36-source.png",
+    "offsetX": 78,
+    "offsetY": 262,
+    "autoAlign": false,
+    "searchRegion": { "minX": 0, "maxX": 350, "minY": 200, "maxY": 750 }
+  }
+}

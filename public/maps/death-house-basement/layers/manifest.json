@@ -1,0 +1,165 @@
+{
+  "mapId": "death-house-basement",
+  "mapSize": {
+    "width": 725,
+    "height": 899
+  },
+  "cacheKey": "death-house-basement-1785448484576",
+  "alignment": {
+    "scaleX": 1.1925159093242035,
+    "offsetX": -29.758265633329145,
+    "scaleY": 0.9058628405244592,
+    "offsetY": 25.455496066671003,
+    "landmarks": [
+      {
+        "name": "pit",
+        "ref": [
+          123.29285714285714,
+          372.54047619047617
+        ],
+        "map": [
+          117.2704280155642,
+          362.9260700389105
+        ]
+      },
+      {
+        "name": "compass",
+        "ref": [
+          85.40561224489795,
+          87.86989795918367
+        ],
+        "map": [
+          72.08928571428571,
+          105.05357142857143
+        ]
+      }
+    ]
+  },
+  "interiorMaskSource": "map-only",
+  "darkBaseFile": "/maps/death-house-basement/layers/dark-base.png",
+  "sourceMapFile": "/maps/death-house-basement.png",
+  "regionIds": [
+    23,
+    24,
+    25,
+    26,
+    27,
+    29,
+    30,
+    31,
+    33,
+    34
+  ],
+  "regions": [
+    {
+      "id": 23,
+      "label": "Room 23 (upper-right crypts)",
+      "cropFile": "/maps/death-house-basement/layers/crop-23.png",
+      "pixelCount": 87828,
+      "manual": true,
+      "placement": {
+        "offsetX": 369,
+        "offsetY": 110
+      }
+    },
+    {
+      "id": 24,
+      "label": "Room 24",
+      "cropFile": "/maps/death-house-basement/layers/crop-24.png",
+      "pixelCount": 49494,
+      "manual": true,
+      "placement": {
+        "offsetX": 218,
+        "offsetY": 93
+      }
+    },
+    {
+      "id": 25,
+      "label": "Room 25 (west hall A–E)",
+      "cropFile": "/maps/death-house-basement/layers/crop-25.png",
+      "pixelCount": 64214,
+      "manual": true,
+      "placement": {
+        "offsetX": 31,
+        "offsetY": 247
+      }
+    },
+    {
+      "id": 26,
+      "label": "Room 26 (vertical corridor)",
+      "cropFile": "/maps/death-house-basement/layers/crop-26.png",
+      "pixelCount": 16898,
+      "manual": true,
+      "placement": {
+        "offsetX": 316,
+        "offsetY": 435
+      }
+    },
+    {
+      "id": 27,
+      "label": "Room 27 (central platform)",
+      "cropFile": "/maps/death-house-basement/layers/crop-27.png",
+      "pixelCount": 24930,
+      "manual": true,
+      "placement": {
+        "offsetX": 389,
+        "offsetY": 447
+      }
+    },
+    {
+      "id": 29,
+      "label": "Room 29 (L-shaped corridor)",
+      "cropFile": "/maps/death-house-basement/layers/crop-29.png",
+      "pixelCount": 23786,
+      "manual": true,
+      "placement": {
+        "offsetX": 389,
+        "offsetY": 607
+      }
+    },
+    {
+      "id": 30,
+      "label": "Room 30 (lower-left room)",
+      "cropFile": "/maps/death-house-basement/layers/crop-30.png",
+      "pixelCount": 10597,
+      "manual": true,
+      "placement": {
+        "offsetX": 272,
+        "offsetY": 548
+      }
+    },
+    {
+      "id": 31,
+      "label": "Room 31 (ritual chapel)",
+      "cropFile": "/maps/death-house-basement/layers/crop-31.png",
+      "pixelCount": 48970,
+      "manual": true,
+      "placement": {
+        "offsetX": 558,
+        "offsetY": 527
+      }
+    },
+    {
+      "id": 33,
+      "label": "Room 33 (workshop)",
+      "cropFile": "/maps/death-house-basement/layers/crop-33.png",
+      "pixelCount": 11922,
+      "manual": true,
+      "placement": {
+        "offsetX": 449,
+        "offsetY": 766
+      }
+    },
+    {
+      "id": 34,
+      "label": "Room 34",
+      "cropFile": "/maps/death-house-basement/layers/crop-34.png",
+      "pixelCount": 29528,
+      "manual": true,
+      "placement": {
+        "offsetX": 248,
+        "offsetY": 733
+      }
+    }
+  ]
+}

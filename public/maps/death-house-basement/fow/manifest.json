@@ -1,0 +1,127 @@
+{
+  "mapId": "death-house-basement",
+  "referenceSize": {
+    "width": 708,
+    "height": 876
+  },
+  "mapSize": {
+    "width": 716,
+    "height": 850
+  },
+  "featherRadius": 4,
+  "regions": [
+    {
+      "id": 25,
+      "label": "Room 25 (west hall A–E)",
+      "seed": {
+        "x": 0.17,
+        "y": 0.46
+      },
+      "maskFile": "/maps/death-house-basement/fow/region-25.png",
+      "pixelCount": 27713
+    },
+    {
+      "id": 21,
+      "label": "Room 21 (upper central)",
+      "seed": {
+        "x": 0.45,
+        "y": 0.17
+      },
+      "maskFile": "/maps/death-house-basement/fow/region-21.png",
+      "pixelCount": 79991
+    },
+    {
+      "id": 23,
+      "label": "Room 23 (upper-right crypts)",
+      "seed": {
+        "x": 0.71,
+        "y": 0.19
+      },
+      "maskFile": "/maps/death-house-basement/fow/region-23.png",
+      "pixelCount": 5029
+    },
+    {
+      "id": 27,
+      "label": "Room 27 (central platform)",
+      "seed": {
+        "x": 0.62,
+        "y": 0.48
+      },
+      "maskFile": "/maps/death-house-basement/fow/region-27.png",
+      "pixelCount": 19776
+    },
+    {
+      "id": 26,
+      "label": "Room 26 (vertical corridor)",
+      "seed": {
+        "x": 0.475,
+        "y": 0.5
+      },
+      "maskFile": "/maps/death-house-basement/fow/region-26.png",
+      "pixelCount": 6004
+    },
+    {
+      "id": 30,
+      "label": "Room 30 (lower-left room)",
+      "seed": {
+        "x": 0.36,
+        "y": 0.7
+      },
+      "maskFile": "/maps/death-house-basement/fow/region-30.png",
+      "pixelCount": 475
+    },
+    {
+      "id": 29,
+      "label": "Room 29 (L-shaped corridor)",
+      "seed": {
+        "x": 0.56,
+        "y": 0.73
+      },
+      "maskFile": "/maps/death-house-basement/fow/region-29.png",
+      "pixelCount": 2718
+    },
+    {
+      "id": 31,
+      "label": "Room 31 (ritual chapel)",
+      "seed": {
+        "x": 0.72,
+        "y": 0.78
+      },
+      "maskFile": "/maps/death-house-basement/fow/region-31.png",
+      "pixelCount": 16185
+    },
+    {
+      "id": 33,
+      "label": "Room 33 (workshop)",
+      "seed": {
+        "x": 0.52,
+        "y": 0.88
+      },
+      "maskFile": "/maps/death-house-basement/fow/region-33.png",
+      "pixelCount": 13605
+    },
+    {
+      "id": 14,
+      "label": "Room 14 (isolated south room)",
+      "seed": {
+        "x": 0.38,
+        "y": 0.94
+      },
+      "maskFile": "/maps/death-house-basement/fow/region-14.png",
+      "pixelCount": 577
+    }
+  ],
+  "interiorMaskFile": "/maps/death-house-basement/fow/interior-mask.png",
+  "regionIds": [
+    25,
+    21,
+    23,
+    27,
+    26,
+    30,
+    29,
+    31,
+    33,
+    14
+  ]
+}
