@@ -1,9 +1,10 @@
 import * as THREE from "three";
 import { getBattleMapById } from "./battleMaps.js";
+import { applyMapLayersToSurface } from "./mapLayers/deathHouseBasementLayers.js";
 
 const textureLoader = new THREE.TextureLoader();
 const textureCache = new Map();
-const BATTLE_MAP_SHADER_VERSION = 3;
+const BATTLE_MAP_SHADER_VERSION = 9;
 
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -29,6 +30,8 @@ const fragmentShader = /* glsl */ `
   uniform float fogStrength;
   uniform float snowStrength;
   uniform float intensity;
+  uniform float mapRevealEnabled;
+  uniform sampler2D revealLayer;
 
   varying vec2 vUv;
 
@@ -176,6 +179,12 @@ const fragmentShader = /* glsl */ `
       color += vec3(0.95, 0.97, 1.0) * flake * snowAmount;
     }
 
+    if (mapRevealEnabled > 0.5) {
+      vec4 reveal = texture2D(revealLayer, vUv);
+      // Dark-base already dims unrevealed interior; decor stays full brightness in the PNG.
+      color = mix(color, reveal.rgb, reveal.a);
+    }
+
     gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
   }
 `;
@@ -205,6 +214,20 @@ export async function loadBattleMapTexture(fileUrl) {
   return texture;
 }
 
+/** Build a loadable URL; never append query params to blob/data URLs. */
+export function resolveBattleMapTextureUrl(mapConfig, useDarkBase = false) {
+  if (!mapConfig) return null;
+  const texturePath = useDarkBase ? mapConfig.layerDarkBase : mapConfig.file;
+  if (!texturePath) return null;
+  if (texturePath.startsWith("blob:") || texturePath.startsWith("data:")) {
+    return texturePath;
+  }
+  if (mapConfig.cacheKey) {
+    return `${texturePath}?v=${encodeURIComponent(mapConfig.cacheKey)}`;
+  }
+  return texturePath;
+}
+
 /** Drop a cached texture so regenerated PNGs reload cleanly. */
 export function invalidateBattleMapTexture(fileUrl) {
   const texture = textureCache.get(fileUrl);
@@ -225,6 +248,8 @@ export function createBattleMapMaterial() {
       fogStrength: { value: 0 },
       snowStrength: { value: 0 },
       intensity: { value: 1 },
+      mapRevealEnabled: { value: 0 },
+      revealLayer: { value: null },
     },
     vertexShader,
     fragmentShader,
@@ -262,6 +287,11 @@ export async function applyBattleMapToSurface(boxSurface, battleMapState, option
   const effectScale = intensity;
 
   if (!enabled) {
+    const material = boxSurface.userData.battleMapMaterial;
+    if (material?.uniforms?.mapRevealEnabled) {
+      material.uniforms.mapRevealEnabled.value = 0;
+      material.uniforms.revealLayer.value = null;
+    }
     const opacity =
       typeof options.fallbackOpacity === "number"
         ? options.fallbackOpacity
@@ -286,7 +316,7 @@ export async function applyBattleMapToSurface(boxSurface, battleMapState, option
 
   if (
     !boxSurface.userData.battleMapMaterial ||
-    !boxSurface.userData.battleMapMaterial.uniforms?.snowStrength ||
+    !boxSurface.userData.battleMapMaterial.uniforms?.mapRevealEnabled ||
     boxSurface.userData.battleMapShaderVersion !== BATTLE_MAP_SHADER_VERSION
   ) {
     boxSurface.userData.battleMapMaterial?.dispose?.();
@@ -295,8 +325,15 @@ export async function applyBattleMapToSurface(boxSurface, battleMapState, option
   }
   const material = boxSurface.userData.battleMapMaterial;
 
-  // Bust cache when map asset version changes (regenerated art).
-  const textureUrl = mapConfig.file;
+  // Layered maps use a darkened base only while fog-of-war is active.
+  const useDarkBase =
+    mapConfig.mapLayers &&
+    mapConfig.layerDarkBase &&
+    battleMapState.fogOfWar?.enabled !== false;
+  const textureUrl = resolveBattleMapTextureUrl(mapConfig, useDarkBase);
+  if (!textureUrl) {
+    return { enabled: false, mapId: mapConfig?.id || "none" };
+  }
   if (mapConfig.cacheKey && textureCache.has(textureUrl)) {
     const cached = textureCache.get(textureUrl);
     if (cached.userData?.cacheKey !== mapConfig.cacheKey) {
@@ -326,6 +363,7 @@ export async function applyBattleMapToSurface(boxSurface, battleMapState, option
 
   boxSurface.material = material;
   boxSurface.userData.usingBattleMap = true;
+  await applyMapLayersToSurface(boxSurface, battleMapState);
   return { enabled: true, mapId: mapConfig.id };
 }
 

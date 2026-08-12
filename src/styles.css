@@ -660,6 +660,36 @@ body.is-resizing-rails * {
   background: #a82e2e;
 }
 
+.death-house-fog-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.4rem, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.death-house-fog-button,
+.map-reveal-btn {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.death-house-fog-button {
+  min-height: 2.25rem;
+}
+
+.death-house-fog-button.is-revealed {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(212, 175, 55, 0.12);
+}
+
+.death-house-fog-panel .field-hint {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
 .btn-row,
 .button-row {
   display: grid;

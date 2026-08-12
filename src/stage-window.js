@@ -31,6 +31,11 @@ import {
   resetFaceCornersToFullFrame,
 } from "./venueGeometry.js";
 import { constrainMapKeystoneWindow, constrainStageKeystoneWindow } from "./fx/projectorWarp.js";
+import { createMapRevealControls } from "./ui/mapRevealControls.js";
+import {
+  resetMapReveal,
+  toggleMapRevealRegion,
+} from "./mapLayers/mapRevealLayers.js";
 
 const canvas = document.getElementById("stage-canvas");
 const statusElement = document.getElementById("status");
@@ -60,6 +65,10 @@ const stageSizeReadout = document.getElementById("stage-size-readout");
 const btnKeystoneLayer = document.getElementById("btn-keystone-layer");
 const castMapSelect = document.getElementById("cast-map-select");
 const castCharacterSelect = document.getElementById("cast-character-select");
+const hotbarRevealPanel = document.getElementById("hotbar-reveal-panel");
+const hotbarRevealLabel = document.getElementById("hotbar-reveal-label");
+const hotbarRevealGrid = document.getElementById("hotbar-reveal-grid");
+const btnRevealClear = document.getElementById("btn-reveal-clear");
 const channel = new BroadcastChannel("dungeon-stage");
 /** Suppress select change handlers while syncing dropdown values from state. */
 let suppressCastSelectEvents = false;
@@ -330,6 +339,64 @@ function broadcastStageContentUpdate(options = {}) {
     at: Date.now(),
   });
 }
+
+function applyMapRevealToRenderer() {
+  renderer.updateFogOfWarReveal(state.battleMap);
+  mapRevealHotbar?.refresh();
+}
+
+function toggleStageMapReveal(regionId) {
+  const nextFog = toggleMapRevealRegion(state.battleMap, regionId);
+  if (!nextFog) return;
+  state.battleMap = normalizeBattleMapState({
+    ...state.battleMap,
+    fogOfWar: nextFog,
+  });
+  applyMapRevealToRenderer();
+  try {
+    patchSceneState({ battleMap: state.battleMap });
+  } catch {
+    // ignore
+  }
+  broadcastStageContentUpdate({ includeAlignment: false });
+  const revealedCount = state.battleMap.fogOfWar?.revealedRegions?.length || 0;
+  setStatus(
+    revealedCount
+      ? `Rooms lit: ${state.battleMap.fogOfWar.revealedRegions.join(", ")}`
+      : "All rooms hidden",
+    1800
+  );
+}
+
+function resetStageMapReveal() {
+  const nextFog = resetMapReveal(state.battleMap);
+  if (!nextFog) return;
+  state.battleMap = normalizeBattleMapState({
+    ...state.battleMap,
+    fogOfWar: nextFog,
+  });
+  applyMapRevealToRenderer();
+  try {
+    patchSceneState({ battleMap: state.battleMap });
+  } catch {
+    // ignore
+  }
+  broadcastStageContentUpdate({ includeAlignment: false });
+  setStatus("All rooms hidden", 1600);
+}
+
+const mapRevealHotbar = hotbarRevealGrid
+  ? createMapRevealControls({
+      panelElement: hotbarRevealPanel,
+      labelElement: hotbarRevealLabel,
+      buttonGrid: hotbarRevealGrid,
+      clearButton: btnRevealClear,
+      buttonClassName: "map-reveal-btn",
+      getBattleMap: () => state.battleMap,
+      onToggleRegion: toggleStageMapReveal,
+      onResetAll: resetStageMapReveal,
+    })
+  : null;
 
 function getActiveStageCharacterId() {
   const selectedId = state.selectedInstanceIds?.[0];
@@ -1814,6 +1881,7 @@ async function applyScene(nextState, options = {}) {
     updateCharacterStageHandlePositions();
   }
   syncCastSelectsFromState();
+  mapRevealHotbar?.refresh();
 }
 
 async function applyCommand(command) {

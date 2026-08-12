@@ -128,6 +128,7 @@
         bottom: 14px;
         z-index: 12;
         display: flex;
+        flex-wrap: wrap;
         align-items: flex-end;
         gap: 0.45rem;
         max-width: calc(100vw - 28px);
@@ -209,6 +210,7 @@
       }
 
       body.presenting .hotbar-panel,
+      body.presenting .hotbar-reveal-panel,
       body.presenting #status {
         opacity: 0;
         pointer-events: none;
@@ -262,9 +264,96 @@
       }
 
       .hotbar-hint {
+        display: none;
+      }
+
+      .hotbar-reveal-panel {
+        display: none;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.35rem;
+        padding: 0.45rem 0.55rem;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: rgba(18, 24, 33, 0.94);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+        transition:
+          opacity 160ms ease,
+          transform 160ms ease;
+        max-width: min(420px, calc(100vw - 80px));
+      }
+
+      .hotbar-reveal-panel.is-visible {
+        display: flex;
+      }
+
+      .hotbar-reveal-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+      }
+
+      .hotbar-reveal-label {
         color: var(--muted);
+        font-size: 0.68rem;
+        font-weight: 650;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .hotbar-reveal-clear {
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid transparent;
+        border-radius: 6px;
+        padding: 0.15rem 0.4rem;
+        font: inherit;
         font-size: 0.72rem;
-        padding: 0 0.3rem;
+        cursor: pointer;
+      }
+
+      .hotbar-reveal-clear:hover,
+      .hotbar-reveal-clear:focus-visible {
+        color: var(--text);
+        border-color: var(--line);
+        outline: none;
+      }
+
+      .map-reveal-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.28rem;
+      }
+
+      .map-reveal-btn {
+        min-width: 2.15rem;
+        height: 2.15rem;
+        padding: 0 0.4rem;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #182131;
+        color: var(--text);
+        font: inherit;
+        font-size: 0.82rem;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+        cursor: pointer;
+        line-height: 1;
+      }
+
+      .map-reveal-btn:hover,
+      .map-reveal-btn:focus-visible {
+        border-color: #4a5a70;
+        outline: none;
+      }
+
+      .map-reveal-btn.is-revealed {
+        border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+        background: rgba(212, 160, 23, 0.16);
+        color: #f0d58a;
+        box-shadow: inset 0 0 0 1px rgba(212, 160, 23, 0.22);
       }
 
       .stage-box-handles {
@@ -515,7 +604,22 @@
         >
           Close
         </button>
-        <span class="hotbar-hint">TL1 map corners · TL2 booth keystone · Reset · Scroll zoom</span>
+        <span class="hotbar-hint" title="TL1 map corners · TL2 booth keystone · Scroll zoom">TL1 · TL2 · Scroll</span>
+      </div>
+
+      <div
+        class="hotbar-reveal-panel"
+        id="hotbar-reveal-panel"
+        hidden
+        aria-label="Room reveal controls"
+      >
+        <div class="hotbar-reveal-head">
+          <span class="hotbar-reveal-label" id="hotbar-reveal-label">Rooms</span>
+          <button type="button" class="hotbar-reveal-clear" id="btn-reveal-clear">
+            Clear
+          </button>
+        </div>
+        <div class="map-reveal-grid" id="hotbar-reveal-grid"></div>
       </div>
     </div>
 

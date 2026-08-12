@@ -7,6 +7,7 @@ import {
   tickBattleMap,
 } from "./battleMapLayer.js";
 import { normalizeBattleMapState, resolveStageFxForBattleMap } from "./battleMaps.js";
+import { syncMapRevealLayers } from "./mapLayers/deathHouseBasementLayers.js";
 import {
   createProceduralCharacter,
   hasProceduralCharacter,
@@ -79,8 +80,12 @@ import {
   updateProjectorPrevizOverlay,
 } from "./fx/projectorPreviz.js";
 import {
+  clampActorInstanceScaleForCharacterStage,
   createDefaultCharacterStageState,
+  DEFAULT_CHARACTER_MODEL_BOUNDS,
   getCharacterStageWorldPose,
+  getMaxActorInstanceScaleForCharacterStage,
+  getMaxActorWorldScaleForCharacterStage,
   MAX_SIZE,
   MIN_SIZE,
   normalizeCharacterStageState,
@@ -120,6 +125,7 @@ export class StageRenderer {
     this.boxHalfExtent = 1.2;
     this._boxHalfDepth = 1.2;
     this.selectedActorIds = new Set();
+    this.modelBoundsByCharacterId = new Map();
 
     this.corners = clampProjectorCorners({
       topLeft: { x: 0.15, y: 0.12 },
@@ -975,6 +981,12 @@ export class StageRenderer {
     return result;
   }
 
+  updateFogOfWarReveal(battleMapState) {
+    this.battleMapState = normalizeBattleMapState(battleMapState || {});
+    const revealedRegions = this.battleMapState.fogOfWar?.revealedRegions || [];
+    syncMapRevealLayers(this.boxSurface, revealedRegions);
+  }
+
   setCalibrationGrid(enabled) {
     this.calibrationGrid = Boolean(enabled);
     this.gridHelper.visible = this.calibrationGrid;
@@ -1244,10 +1256,41 @@ export class StageRenderer {
     root.updateMatrixWorld(true);
 
     box = new THREE.Box3().setFromObject(root);
+    box.getSize(size);
+    root.userData.normalizedBounds = {
+      x: Math.max(size.x, 0.001),
+      y: Math.max(size.y, 0.001),
+      z: Math.max(size.z, 0.001),
+    };
     box.getCenter(center);
     root.position.x += -center.x;
     root.position.z += -center.z;
     root.position.y += -box.min.y;
+  }
+
+  rememberCharacterModelBounds(characterId, bounds) {
+    if (!characterId || !bounds) return;
+    this.modelBoundsByCharacterId.set(characterId, {
+      x: Math.max(Number(bounds.x) || 0, 0.001),
+      y: Math.max(Number(bounds.y) || 0, 0.001),
+      z: Math.max(Number(bounds.z) || 0, 0.001),
+    });
+  }
+
+  getCharacterModelBounds(characterId) {
+    return (
+      this.modelBoundsByCharacterId.get(characterId) ||
+      DEFAULT_CHARACTER_MODEL_BOUNDS
+    );
+  }
+
+  getMaxActorInstanceScaleForCharacterStage(characterId, characterStageState) {
+    return getMaxActorInstanceScaleForCharacterStage(
+      this.getCharacterModelBounds(characterId),
+      characterStageState,
+      this.boxHalfExtent,
+      this._boxHalfDepth
+    );
   }
 
   prepareMaterials(root, { preserveDark = false } = {}) {
@@ -1312,6 +1355,13 @@ export class StageRenderer {
     }
     this.prepareMaterials(root, { preserveDark });
     this.normalizeModel(root, 1);
+    const characterKey = actor?.characterId || actor?.id;
+    if (characterKey && root.userData.normalizedBounds) {
+      this.rememberCharacterModelBounds(
+        characterKey,
+        root.userData.normalizedBounds
+      );
+    }
     const characterFx = combineCharacterFx([
       applyCharacterLook(root, lookId, {
         faceForward: actor?.faceForward ?? null,
@@ -1368,7 +1418,7 @@ export class StageRenderer {
   applyActorTransform(entry, actor) {
     const visible = Boolean(actor.enabled);
     const scaleValue = Number(actor.scale);
-    const scale = Number.isFinite(scaleValue) && scaleValue > 0 ? scaleValue : 1;
+    let scale = Number.isFinite(scaleValue) && scaleValue > 0 ? scaleValue : 1;
     const elevationValue = Number(actor.elevation);
     const elevation = Number.isFinite(elevationValue) ? elevationValue : 0;
     const rotationValue = Number(actor.rotation);
@@ -1378,11 +1428,25 @@ export class StageRenderer {
 
     entry.wrapper.visible = visible;
     entry.wrapper.position.set(actor.x ?? 0, elevation, actor.z ?? 0);
+    entry.onCharacterStage = Boolean(actor.onCharacterStage);
+    if (entry.onCharacterStage) {
+      const modelBounds =
+        entry.model?.userData?.normalizedBounds ||
+        this.getCharacterModelBounds(entry.characterId || actor.characterId);
+      const maxWorldScale = getMaxActorWorldScaleForCharacterStage(
+        modelBounds,
+        this.characterStageState,
+        this.boxHalfExtent,
+        this._boxHalfDepth
+      );
+      if (Number.isFinite(maxWorldScale) && maxWorldScale > 0) {
+        scale = Math.min(scale, maxWorldScale);
+      }
+    }
     entry.wrapper.scale.setScalar(scale);
     entry.wrapper.rotation.y = (rotationDegrees * Math.PI) / 180;
     entry.rotation = rotationDegrees;
     entry.elevation = elevation;
-    entry.onCharacterStage = Boolean(actor.onCharacterStage);
     entry.hover = actor.hover === true;
     entry.hoverAmplitude = Number(actor.hoverAmplitude) || 0.06;
     if (entry.model) {

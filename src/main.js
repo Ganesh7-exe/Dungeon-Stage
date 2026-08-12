@@ -42,6 +42,11 @@ import { normalizeStageFxState } from "./fx/stageFxState.js";
 import { createVenuePanel } from "./ui/venuePanel.js";
 import { createStageFxPanel } from "./ui/stageFxPanel.js";
 import { createCharacterStagePanel } from "./ui/characterStagePanel.js";
+import { createDeathHouseFogPanel } from "./ui/deathHouseFogPanel.js";
+import {
+  toggleDeathHouseRegion,
+  resetDeathHouseFog,
+} from "./mapLayers/deathHouseBasementLayers.js";
 import { initRailResize } from "./ui/railResize.js";
 import { confirmRemoveMap } from "./ui/confirmDialog.js";
 import { openProjectorOutputWindow } from "./displayOutput.js";
@@ -297,6 +302,8 @@ function handleStageMessage(command) {
           selectButton?.classList.toggle("is-selected", selected);
           selectButton?.setAttribute("aria-selected", selected ? "true" : "false");
         });
+      deathHouseFogPanel?.refresh();
+      previewRenderer.updateFogOfWarReveal(state.battleMap);
     }
     if (Array.isArray(command.actorsOnMap)) {
       state.actorsOnMap = command.actorsOnMap;
@@ -1898,6 +1905,32 @@ document.getElementById("preview-warp").addEventListener("change", async () => {
   await syncScene();
 });
 
+let deathHouseFogPanel = null;
+
+async function toggleFogRegion(regionId) {
+  const nextFog = toggleDeathHouseRegion(state.battleMap, regionId);
+  if (!nextFog) return;
+  state.battleMap = normalizeBattleMapState({
+    ...state.battleMap,
+    fogOfWar: nextFog,
+  });
+  deathHouseFogPanel?.refresh();
+  previewRenderer.updateFogOfWarReveal(state.battleMap);
+  await syncScene({ immediate: true });
+}
+
+async function resetFogRegions() {
+  const nextFog = resetDeathHouseFog(state.battleMap);
+  if (!nextFog) return;
+  state.battleMap = normalizeBattleMapState({
+    ...state.battleMap,
+    fogOfWar: nextFog,
+  });
+  deathHouseFogPanel?.refresh();
+  previewRenderer.updateFogOfWarReveal(state.battleMap);
+  await syncScene({ immediate: true });
+}
+
 function broadcastCustomMapsChanged() {
   const payload = { type: "custom-maps-changed", at: Date.now() };
   try {
@@ -1964,6 +1997,7 @@ function ensureBattleMapControls() {
         enabledInput.checked = true;
         renderBattleMapThumbs(state.battleMap.mapId);
         broadcastCustomMapsChanged();
+        deathHouseFogPanel?.refresh();
         await syncScene({ immediate: true });
         previewStatus.textContent = `Added custom map · ${addedEntry.name}`;
       } catch (error) {
@@ -2035,9 +2069,17 @@ function ensureBattleMapControls() {
     }
 
     selectButton.addEventListener("click", async () => {
+      const previousMapId = state.battleMap?.mapId;
       state.battleMap = selectBattleMap(mapEntry);
       mapSelect.value = state.battleMap.mapId;
+      if (previousMapId !== state.battleMap.mapId) {
+        state.battleMap = normalizeBattleMapState({
+          ...state.battleMap,
+          fogOfWar: undefined,
+        });
+      }
       renderBattleMapThumbs(state.battleMap.mapId);
+      deathHouseFogPanel?.refresh();
       await syncScene({ immediate: true });
     });
 
@@ -2067,11 +2109,13 @@ function ensureBattleMapControls() {
             ...state.battleMap,
             mapId: "village-of-barovia",
             enabled: true,
+            fogOfWar: undefined,
           });
         }
 
         renderBattleMapThumbs(mapSelect.value);
         broadcastCustomMapsChanged();
+        deathHouseFogPanel?.refresh();
         await syncScene({ immediate: true });
         previewStatus.textContent = wasSelected
           ? "Custom map removed · switched to Village of Barovia"
@@ -2150,10 +2194,19 @@ function ensureBattleMapControls() {
     if (intensityOut) {
       intensityOut.textContent = battleMap.intensity.toFixed(2);
     }
+    deathHouseFogPanel?.refresh();
   }
 
   async function commitBattleMap() {
+    const previousMapId = state.battleMap?.mapId;
     readBattleMapUiIntoState();
+    if (previousMapId !== state.battleMap.mapId) {
+      state.battleMap = normalizeBattleMapState({
+        ...state.battleMap,
+        fogOfWar: undefined,
+      });
+    }
+    deathHouseFogPanel?.refresh();
     await syncScene({ immediate: true });
   }
 
@@ -2174,6 +2227,20 @@ function ensureBattleMapControls() {
     await commitBattleMap();
   });
 }
+
+const battleMapCard = document.getElementById("battle-map-thumbs")?.closest(".card");
+deathHouseFogPanel = battleMapCard
+  ? createDeathHouseFogPanel({
+      container: battleMapCard,
+      getBattleMap: () => state.battleMap,
+      onRevealRegion: (regionId) => {
+        toggleFogRegion(regionId);
+      },
+      onResetFog: () => {
+        resetFogRegions();
+      },
+    })
+  : null;
 
 function readRawPersistedBattleMapId() {
   try {
@@ -2203,6 +2270,7 @@ async function bootstrapCustomBattleMaps() {
     if (persistedMapId && state.battleMap.mapId === persistedMapId) {
       await syncScene({ immediate: true });
     }
+    deathHouseFogPanel?.refresh();
   } catch (error) {
     console.warn("Custom battle maps failed to load", error);
     ensureBattleMapControls();
