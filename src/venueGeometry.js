@@ -597,8 +597,8 @@ export function createDefaultVenueState() {
     /** Which face's TL/TR/BR/BL handles are shown / edited (one at a time). */
     calibrationFaceId: "top",
     showFaceOutlines: true,
-    /** Wireframe eyes + frustum pyramids in the control preview (not on output). */
-    showFrustumHelpers: true,
+    /** Deprecated — lamp aim helpers removed from UI; kept for state compat. */
+    showFrustumHelpers: false,
     /** OS display id for Open projector feed (Electron / Window Management). */
     outputDisplayId: "",
     /** Fullscreen the feed on the chosen display when opening. */
@@ -638,7 +638,7 @@ export function normalizeVenueState(raw = {}) {
     activeProjectorId,
     calibrationFaceId,
     showFaceOutlines: raw.showFaceOutlines !== false,
-    showFrustumHelpers: raw.showFrustumHelpers !== false,
+    showFrustumHelpers: false,
     outputDisplayId:
       raw.outputDisplayId == null ? "" : String(raw.outputDisplayId),
     openFullscreenOnOutput: raw.openFullscreenOnOutput !== false,

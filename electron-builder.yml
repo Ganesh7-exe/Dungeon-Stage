@@ -4,7 +4,7 @@
   "productName": "Dungeon Stage",
   "copyright": "Copyright © Dungeon Stage",
   "directories": {
-    "output": "C:/Users/studd/AppData/Local/DungeonStageBuild/release-v8",
+    "output": "C:/Users/studd/AppData/Local/DungeonStageBuild/release-v9",
     "buildResources": "electron/build"
   },
   "files": [

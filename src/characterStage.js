@@ -6,8 +6,20 @@
 
 const DEFAULT_SIZE = 0.95;
 const MIN_SIZE = 0.25;
-const MAX_SIZE = 3.5;
+const MAX_SIZE = 1.5;
 const BASE_SIZE_FOR_SCALE = 0.95;
+/** Matches StageRenderer.normalizeModel — tallest axis after load. */
+export const NORMALIZED_MODEL_MAX_DIMENSION = 1.15;
+const MIN_ACTOR_INSTANCE_SCALE = 0.3;
+const MAX_ACTOR_INSTANCE_SCALE = 2.5;
+/** Keep a hair of clearance inside the booth walls for FX and silhouettes. */
+export const CHARACTER_STAGE_ACTOR_FIT_MARGIN = 0.94;
+
+export const DEFAULT_CHARACTER_MODEL_BOUNDS = {
+  x: NORMALIZED_MODEL_MAX_DIMENSION,
+  y: NORMALIZED_MODEL_MAX_DIMENSION,
+  z: NORMALIZED_MODEL_MAX_DIMENSION,
+};
 
 export const CHARACTER_STAGE_BACKDROPS = [
   { id: "void", label: "Void rift" },
@@ -101,6 +113,103 @@ export function getStageActorLocalOffsets(actorCount) {
   return offsets;
 }
 
+function sanitizeModelBounds(rawBounds) {
+  if (!rawBounds || typeof rawBounds !== "object") {
+    return { ...DEFAULT_CHARACTER_MODEL_BOUNDS };
+  }
+  const readAxis = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+  return {
+    x: readAxis(rawBounds.x) ?? DEFAULT_CHARACTER_MODEL_BOUNDS.x,
+    y: readAxis(rawBounds.y) ?? DEFAULT_CHARACTER_MODEL_BOUNDS.y,
+    z: readAxis(rawBounds.z) ?? DEFAULT_CHARACTER_MODEL_BOUNDS.z,
+  };
+}
+
+/**
+ * Max wrapper scale so a normalized model stays inside the booth volume.
+ */
+export function getMaxActorWorldScaleForCharacterStage(
+  modelBounds,
+  stageState,
+  boxHalfWidth,
+  boxHalfDepth,
+  options = {}
+) {
+  const pose = getCharacterStageWorldPose(stageState, boxHalfWidth, boxHalfDepth);
+  if (!pose.enabled) return null;
+
+  const bounds = sanitizeModelBounds(modelBounds);
+  const margin = Number(options.margin);
+  const fitMargin = Number.isFinite(margin) ? margin : CHARACTER_STAGE_ACTOR_FIT_MARGIN;
+
+  return (
+    fitMargin *
+    Math.min(
+      pose.size / bounds.x,
+      pose.size / bounds.z,
+      pose.height / bounds.y
+    )
+  );
+}
+
+/**
+ * Max persisted Size slider value while the 3D booth is on.
+ */
+export function getMaxActorInstanceScaleForCharacterStage(
+  modelBounds,
+  stageState,
+  boxHalfWidth,
+  boxHalfDepth,
+  options = {}
+) {
+  const maxWorldScale = getMaxActorWorldScaleForCharacterStage(
+    modelBounds,
+    stageState,
+    boxHalfWidth,
+    boxHalfDepth,
+    options
+  );
+  if (maxWorldScale == null) return MAX_ACTOR_INSTANCE_SCALE;
+
+  const pose = getCharacterStageWorldPose(stageState, boxHalfWidth, boxHalfDepth);
+  const scaleFactor = Math.max(0.001, pose.characterScaleFactor);
+  return Math.min(
+    MAX_ACTOR_INSTANCE_SCALE,
+    Math.max(MIN_ACTOR_INSTANCE_SCALE, maxWorldScale / scaleFactor)
+  );
+}
+
+export function clampActorInstanceScaleForCharacterStage(
+  instanceScale,
+  modelBounds,
+  stageState,
+  boxHalfWidth,
+  boxHalfDepth,
+  options = {}
+) {
+  const parsedScale = Number(instanceScale);
+  const safeScale = Number.isFinite(parsedScale) ? parsedScale : 1;
+  const stage = normalizeCharacterStageState(stageState);
+  if (!stage.enabled) {
+    return Math.min(
+      MAX_ACTOR_INSTANCE_SCALE,
+      Math.max(MIN_ACTOR_INSTANCE_SCALE, safeScale)
+    );
+  }
+
+  const maxScale = getMaxActorInstanceScaleForCharacterStage(
+    modelBounds,
+    stage,
+    boxHalfWidth,
+    boxHalfDepth,
+    options
+  );
+  return Math.min(maxScale, Math.max(MIN_ACTOR_INSTANCE_SCALE, safeScale));
+}
+
 /**
  * Map an actor index to world XZ on the character stage (fixed layout).
  * Returns null when the stage is disabled.
@@ -135,4 +244,6 @@ export {
   MIN_SIZE,
   MAX_SIZE,
   BASE_SIZE_FOR_SCALE,
+  MIN_ACTOR_INSTANCE_SCALE,
+  MAX_ACTOR_INSTANCE_SCALE,
 };

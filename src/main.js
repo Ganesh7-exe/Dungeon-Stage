@@ -37,7 +37,7 @@ import {
 import { getCharacterCategories } from "./characters.js";
 import { voicemodClient } from "./voicemodClient.js";
 import { initVoiceLab } from "./voiceLabUi.js";
-import { getProjectorById, normalizeVenueState, resetFaceCornersToFullFrame } from "./venueGeometry.js";
+import { getProjectorById, getBoxExtents, normalizeVenueState, resetFaceCornersToFullFrame } from "./venueGeometry.js";
 import { normalizeStageFxState } from "./fx/stageFxState.js";
 import { createVenuePanel } from "./ui/venuePanel.js";
 import { createStageFxPanel } from "./ui/stageFxPanel.js";
@@ -50,7 +50,12 @@ import {
 import { initRailResize } from "./ui/railResize.js";
 import { confirmRemoveMap } from "./ui/confirmDialog.js";
 import { openProjectorOutputWindow } from "./displayOutput.js";
-import { normalizeCharacterStageState } from "./characterStage.js";
+import {
+  clampActorInstanceScaleForCharacterStage,
+  MAX_ACTOR_INSTANCE_SCALE,
+  MIN_ACTOR_INSTANCE_SCALE,
+  normalizeCharacterStageState,
+} from "./characterStage.js";
 
 const channel = new BroadcastChannel("dungeon-stage");
 
@@ -360,8 +365,6 @@ function handleStageMessage(command) {
       state.venue = normalizeVenueState({
         ...state.venue,
         enabled: incoming.enabled || state.venue.enabled,
-        showFrustumHelpers:
-          incoming.showFrustumHelpers ?? state.venue.showFrustumHelpers,
         showFaceOutlines:
           incoming.showFaceOutlines ?? state.venue.showFaceOutlines,
         activeProjectorId:
@@ -797,6 +800,75 @@ function renderCharacterList() {
 
 function isCharacterStageEnabled() {
   return state.characterStage?.enabled !== false;
+}
+
+function getVenueHalfExtentsFromState() {
+  try {
+    const { halfWidth, halfDepth } = getBoxExtents(
+      state.venue?.box || { widthCm: 120, depthCm: 120, heightCm: 60 }
+    );
+    return { halfWidth, halfDepth };
+  } catch {
+    return { halfWidth: 1.2, halfDepth: 1.2 };
+  }
+}
+
+function clampActorScaleForCurrentStage(characterId, requestedScale) {
+  const parsedScale = Number(requestedScale);
+  const safeScale = Number.isFinite(parsedScale) ? parsedScale : 1;
+  if (!isCharacterStageEnabled()) {
+    return Math.min(
+      MAX_ACTOR_INSTANCE_SCALE,
+      Math.max(MIN_ACTOR_INSTANCE_SCALE, safeScale)
+    );
+  }
+  const { halfWidth, halfDepth } = getVenueHalfExtentsFromState();
+  const modelBounds = previewRenderer.getCharacterModelBounds(characterId);
+  return clampActorInstanceScaleForCharacterStage(
+    safeScale,
+    modelBounds,
+    state.characterStage,
+    halfWidth,
+    halfDepth
+  );
+}
+
+function clampAllActorScalesForCharacterStage() {
+  if (!isCharacterStageEnabled()) return false;
+  let changed = false;
+  for (const instance of state.actorsOnMap || []) {
+    const nextScale = clampActorScaleForCurrentStage(
+      instance.characterId,
+      instance.scale
+    );
+    if (nextScale !== instance.scale) {
+      instance.scale = nextScale;
+      changed = true;
+    }
+  }
+  if (changed && state.selectedInstanceIds?.length === 1) {
+    const selected = getActorInstance(state, state.selectedInstanceIds[0]);
+    if (selected) state.placement.scale = selected.scale;
+  }
+  return changed;
+}
+
+function getActorScaleSliderLimits(characterId) {
+  if (!isCharacterStageEnabled()) {
+    return { min: MIN_ACTOR_INSTANCE_SCALE, max: MAX_ACTOR_INSTANCE_SCALE };
+  }
+  const maxScale = previewRenderer.getMaxActorInstanceScaleForCharacterStage(
+    characterId,
+    state.characterStage
+  );
+  return { min: MIN_ACTOR_INSTANCE_SCALE, max: maxScale };
+}
+
+function updateActorScaleSliderLimits(characterId) {
+  if (!posScale) return;
+  const limits = getActorScaleSliderLimits(characterId);
+  posScale.min = String(limits.min);
+  posScale.max = String(limits.max.toFixed(2));
 }
 
 function updatePlacementModeUi() {
@@ -1379,20 +1451,33 @@ function renderPlacementControls() {
   const primary = primarySelectedActor();
   const selected = selectedActors();
   if (primary && selected.length === 1) {
+    updateActorScaleSliderLimits(primary.characterId);
+    const clampedScale = clampActorScaleForCurrentStage(
+      primary.characterId,
+      primary.scale
+    );
+    if (clampedScale !== primary.scale) {
+      primary.scale = clampedScale;
+      state.placement.scale = clampedScale;
+    }
     posX.value = String(primary.x);
     posZ.value = String(primary.z);
-    posScale.value = String(primary.scale);
+    posScale.value = String(clampedScale);
     posXOut.textContent = Number(primary.x).toFixed(2);
     posZOut.textContent = Number(primary.z).toFixed(2);
-    posScaleOut.textContent = Number(primary.scale).toFixed(2);
+    posScaleOut.textContent = Number(clampedScale).toFixed(2);
     const rotation = clampRotation(primary.rotation);
     if (posRotation) posRotation.value = String(Math.round(rotation));
     if (posRotationOut) posRotationOut.textContent = `${Math.round(rotation)}°`;
     if (posHover) posHover.checked = primary.hover === true;
   } else if (selected.length > 1) {
-    const scales = selected.map((instance) => Number(instance.scale) || 1);
+    const scales = selected.map((instance) =>
+      clampActorScaleForCurrentStage(instance.characterId, instance.scale)
+    );
     const averageScale =
       scales.reduce((sum, value) => sum + value, 0) / scales.length;
+    posScale.min = String(MIN_ACTOR_INSTANCE_SCALE);
+    posScale.max = String(MAX_ACTOR_INSTANCE_SCALE);
     posScale.value = String(averageScale);
     posXOut.textContent = "group";
     posZOut.textContent = "group";
@@ -1408,6 +1493,8 @@ function renderPlacementControls() {
   } else {
     posX.value = "0";
     posZ.value = "0";
+    posScale.min = String(MIN_ACTOR_INSTANCE_SCALE);
+    posScale.max = String(MAX_ACTOR_INSTANCE_SCALE);
     posScale.value = String(state.placement?.scale ?? 1);
     posXOut.textContent = "0.00";
     posZOut.textContent = "0.00";
@@ -1595,8 +1682,23 @@ function bindPlacementControls() {
         if (selected.length > 1) continue;
         instance[field] = clampPlacementAxis(value);
       } else if (field === "scale") {
-        instance.scale = value;
-        state.placement.scale = value;
+        const clampedScale =
+          selected.length === 1
+            ? clampActorScaleForCurrentStage(selected[0].characterId, value)
+            : value;
+        for (const instance of selected) {
+          instance.scale =
+            selected.length === 1
+              ? clampedScale
+              : clampActorScaleForCurrentStage(instance.characterId, value);
+        }
+        state.placement.scale =
+          selected.length === 1 ? clampedScale : state.placement.scale;
+        if (selected.length === 1) {
+          posScale.value = String(
+            clampActorScaleForCurrentStage(selected[0].characterId, value)
+          );
+        }
       } else if (field === "elevation") {
         instance.elevation = clampElevation(value);
         state.placement.elevation = instance.elevation;
@@ -2301,8 +2403,6 @@ const venuePanel = venuePanelMount
       },
       onOpenProjectorWindow: openProjectorWindow,
       onOpenMappingStudio: openMappingStudio,
-      onFrameActiveEye: () => previewRenderer.frameActiveProjectorEye(),
-      onResetPreviewCamera: () => previewRenderer.resetPreviewCamera(),
     })
   : null;
 
@@ -2325,7 +2425,9 @@ const characterStagePanel = characterStagePanelMount
       onChange: async (nextCharacterStage) => {
         state.characterStage = nextCharacterStage;
         characterStagePanel.syncFromState();
+        clampAllActorScalesForCharacterStage();
         updatePlacementModeUi();
+        renderPlacementControls();
         await syncScene({ immediate: true });
       },
     })

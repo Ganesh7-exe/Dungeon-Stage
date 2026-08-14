@@ -10,13 +10,11 @@ import {
 import { normalizeBattleMapState } from "./battleMaps.js";
 import { normalizeCharacterStageState } from "./characterStage.js";
 import {
-  FACE_IDS,
   FACE_LABELS,
   areFaceCornersHealthy,
   clampFaceCorner,
   createDefaultFaceCorners,
   getProjectorById,
-  getUnitsPerMetre,
   normalizeVenueState,
   repairProjectorFaceCorners,
   resetFaceCornersToFullFrame,
@@ -36,11 +34,6 @@ const boxSizeLabel = document.getElementById("box-size-label");
 const boxWidthInput = document.getElementById("box-width-cm");
 const boxDepthInput = document.getElementById("box-depth-cm");
 const boxHeightInput = document.getElementById("box-height-cm");
-const projectorSelect = document.getElementById("projector-select");
-const modeSelect = document.getElementById("mode-select");
-const fovInput = document.getElementById("fov-input");
-const faceSelect = document.getElementById("face-select");
-const toggleLampHelper = document.getElementById("toggle-lamp-helper");
 const btnFitCorners = document.getElementById("btn-fit-corners");
 const btnResync = document.getElementById("btn-resync");
 const btnOpenOutput = document.getElementById("btn-open-output");
@@ -58,7 +51,7 @@ state.venue = repairProjectorCalibration(state.venue || {});
 if (urlProjectorId) {
   state.venue.activeProjectorId = urlProjectorId;
 }
-/** Lamp frustum / drag is Advanced-only — off for the real-life align path. */
+/** Lamp aim helpers removed — always off. */
 state.venue.showFrustumHelpers = false;
 
 /** Left: warped projector feed + corner handles. */
@@ -85,11 +78,6 @@ let handlesVisible = true;
 let statusHideTimer = 0;
 let cornerSaveTimer = 0;
 let outputWindow = null;
-let lampHelperEnabled = false;
-
-let isDraggingProjector = false;
-let projectorDragPointerId = null;
-let projectorDragSnapshot = null;
 
 function setStatus(text, autoHideMs = 0) {
   statusElement.textContent = text;
@@ -159,79 +147,6 @@ function announceReady() {
 
 function activeProjectorId() {
   return state.venue.activeProjectorId;
-}
-
-function refreshProjectorSelect() {
-  const projectors = state.venue.projectors || [];
-  const previous = projectorSelect?.value;
-  if (!projectorSelect) {
-    refreshFaceSelect();
-    refreshModeSelect();
-    refreshBoxSizeLabel();
-    return;
-  }
-  projectorSelect.innerHTML = "";
-  for (const projector of projectors) {
-    const option = document.createElement("option");
-    option.value = projector.id;
-    option.textContent = projector.label;
-    projectorSelect.appendChild(option);
-  }
-  const preferred =
-    projectors.find((projector) => projector.id === state.venue.activeProjectorId)
-      ?.id ||
-    projectors.find((projector) => projector.id === previous)?.id ||
-    projectors[0]?.id ||
-    "";
-  if (preferred) {
-    projectorSelect.value = preferred;
-    state.venue.activeProjectorId = preferred;
-  }
-  refreshFaceSelect();
-  refreshModeSelect();
-  refreshBoxSizeLabel();
-  syncLampHelperToggle();
-}
-
-function refreshModeSelect() {
-  const projector = getProjectorById(state.venue, state.venue.activeProjectorId);
-  const mode = projector?.projectionMode || "projector";
-  if (modeSelect) {
-    modeSelect.value = mode === "anamorphic" ? "anamorphic" : "projector";
-  }
-  if (fovInput) {
-    fovInput.value = String(Math.round(projector?.fovDegrees ?? 40));
-  }
-}
-
-function refreshFaceSelect() {
-  if (!faceSelect) return;
-  const projector = getProjectorById(state.venue, state.venue.activeProjectorId);
-  const faceIds = projector?.faceIds?.length ? projector.faceIds : ["top"];
-  faceSelect.innerHTML = "";
-  for (const faceId of FACE_IDS) {
-    if (!faceIds.includes(faceId)) continue;
-    const option = document.createElement("option");
-    option.value = faceId;
-    option.textContent = FACE_LABELS[faceId] || faceId;
-    faceSelect.appendChild(option);
-  }
-  const calibrationFaceId = faceIds.includes(state.venue.calibrationFaceId)
-    ? state.venue.calibrationFaceId
-    : faceIds[0];
-  state.venue.calibrationFaceId = calibrationFaceId;
-  faceSelect.value = calibrationFaceId;
-}
-
-function syncLampHelperToggle() {
-  if (toggleLampHelper) {
-    toggleLampHelper.checked = lampHelperEnabled;
-  }
-}
-
-function applyLampHelperVisibility() {
-  state.venue.showFrustumHelpers = lampHelperEnabled;
-  applyVenueToRenderers();
 }
 
 function persistVenueLocally() {
@@ -475,7 +390,7 @@ function renderHandles() {
 function repairProjectorCalibration(venue) {
   const next = normalizeVenueState(venue);
   next.enabled = true;
-  next.showFrustumHelpers = true;
+  next.showFrustumHelpers = false;
   next.showFaceOutlines = true;
   for (const projector of next.projectors) {
     // Legacy broken grazing "camera" → TD projector throw.
@@ -502,7 +417,7 @@ function repairProjectorCalibration(venue) {
 function applyVenueToRenderers() {
   state.venue = normalizeVenueState(state.venue);
   state.venue.enabled = true;
-  state.venue.showFrustumHelpers = lampHelperEnabled;
+  state.venue.showFrustumHelpers = false;
   state.venue.showFaceOutlines = true;
   outputRenderer.setVenueState(state.venue);
   sceneRenderer.setVenueState(state.venue);
@@ -548,14 +463,14 @@ async function applyScene(nextState, options = {}) {
   if (urlProjectorId) {
     merged.venue.activeProjectorId = urlProjectorId;
   }
-  merged.venue.showFrustumHelpers = lampHelperEnabled;
+  merged.venue.showFrustumHelpers = false;
 
   if (typeof nextState?.testBackdrop !== "boolean") {
     merged.testBackdrop = false;
   }
 
   state = merged;
-  refreshProjectorSelect();
+  refreshBoxSizeLabel();
 
   const visualState = { ...state, mode: "single" };
   await outputRenderer.applySceneState(visualState);
@@ -614,9 +529,9 @@ async function applyCommand(command) {
       state.venue = normalizeVenueState(command.venue);
       if (urlProjectorId) state.venue.activeProjectorId = urlProjectorId;
       state.venue.enabled = true;
-      state.venue.showFrustumHelpers = lampHelperEnabled;
+      state.venue.showFrustumHelpers = false;
       applyVenueToRenderers();
-      refreshProjectorSelect();
+      refreshBoxSizeLabel();
       syncOutputDisplayControlsFromVenue();
       renderHandles();
       return;
@@ -633,120 +548,6 @@ async function applyCommand(command) {
     console.warn("Mapping studio command failed", error);
     setStatus(`Error: ${error.message || "unknown"}`);
   }
-}
-
-function bindProjectorDragOnScene() {
-  const wrap = sceneCanvas.parentElement;
-  if (!wrap) return;
-
-  const applyDrag = (event) => {
-    if (!projectorDragSnapshot) return;
-    let nextY = projectorDragSnapshot.currentY;
-    if (event.shiftKey || projectorDragSnapshot.heightMode) {
-      const deltaPixels = projectorDragSnapshot.originClientY - event.clientY;
-      nextY = projectorDragSnapshot.startY + deltaPixels * 0.012;
-      projectorDragSnapshot.heightMode = true;
-      projectorDragSnapshot.currentY = nextY;
-    }
-    const plane = sceneRenderer.hitHorizontalPlane(
-      event.clientX,
-      event.clientY,
-      nextY
-    );
-    if (!plane) return;
-    projectorDragSnapshot.currentY = nextY;
-    const nextVenue = sceneRenderer.setProjectorWorldPosition(
-      projectorDragSnapshot.projectorId,
-      { x: plane.x, y: nextY, z: plane.z }
-    );
-    state.venue = nextVenue;
-    outputRenderer.setVenueState(state.venue);
-  };
-
-  wrap.addEventListener("pointerdown", (event) => {
-    if (!lampHelperEnabled) return;
-    if (event.button !== 0 || isDraggingProjector) return;
-    const picked = sceneRenderer.pickProjector(event.clientX, event.clientY);
-    if (!picked) return;
-    event.preventDefault();
-    isDraggingProjector = true;
-    projectorDragPointerId = event.pointerId;
-    projectorDragSnapshot = {
-      projectorId: picked.projectorId,
-      startY: picked.y,
-      currentY: picked.y,
-      originClientY: event.clientY,
-      heightMode: Boolean(event.shiftKey),
-    };
-    state.venue.activeProjectorId = picked.projectorId;
-    applyVenueToRenderers();
-    refreshProjectorSelect();
-    renderHandles();
-    sceneRenderer.setOrbitEnabled(false);
-    wrap.setPointerCapture(event.pointerId);
-    setStatus(
-      event.shiftKey
-        ? "Raising / lowering projector…"
-        : "Aiming projector — scroll to dolly"
-    );
-  });
-
-  wrap.addEventListener("pointermove", (event) => {
-    if (!isDraggingProjector || event.pointerId !== projectorDragPointerId) {
-      return;
-    }
-    applyDrag(event);
-  });
-
-  const endDrag = (event) => {
-    if (!isDraggingProjector || event.pointerId !== projectorDragPointerId) {
-      return;
-    }
-    isDraggingProjector = false;
-    projectorDragPointerId = null;
-    projectorDragSnapshot = null;
-    sceneRenderer.setOrbitEnabled(true);
-    try {
-      wrap.releasePointerCapture(event.pointerId);
-    } catch {
-      // already released
-    }
-    state.venue = normalizeVenueState(sceneRenderer.venueState);
-    applyVenueToRenderers();
-    persistVenueLocally();
-    broadcastVenueUpdate();
-    setStatus("Lamp helper updated", 2000);
-  };
-
-  wrap.addEventListener("pointerup", endDrag);
-  wrap.addEventListener("pointercancel", endDrag);
-
-  wrap.addEventListener(
-    "wheel",
-    (event) => {
-      if (!lampHelperEnabled) return;
-      if (!isDraggingProjector || !projectorDragSnapshot) return;
-      event.preventDefault();
-      const nextVenue = sceneRenderer.dollyProjector(
-        projectorDragSnapshot.projectorId,
-        event.deltaY
-      );
-      state.venue = nextVenue;
-      outputRenderer.setVenueState(state.venue);
-      const projector = getProjectorById(
-        state.venue,
-        projectorDragSnapshot.projectorId
-      );
-      if (projector?.viewer?.positionM) {
-        const unitsPerMetre = getUnitsPerMetre(state.venue.box);
-        projectorDragSnapshot.currentY =
-          projector.viewer.positionM.y * unitsPerMetre;
-        projectorDragSnapshot.startY = projectorDragSnapshot.currentY;
-      }
-      setStatus("Dollied projector…");
-    },
-    { passive: false }
-  );
 }
 
 async function refreshOutputDisplayOptions() {
@@ -857,68 +658,6 @@ async function openProjectorFeed() {
   );
 }
 
-projectorSelect?.addEventListener("change", () => {
-  state.venue.activeProjectorId = projectorSelect.value;
-  const projector = getProjectorById(state.venue, state.venue.activeProjectorId);
-  state.venue.calibrationFaceId = projector?.faceIds?.[0] || "top";
-  applyVenueToRenderers();
-  refreshFaceSelect();
-  refreshModeSelect();
-  renderHandles();
-  persistVenueLocally();
-  broadcastVenueUpdate();
-  setStatus(`Active: ${projectorSelect.selectedOptions[0]?.textContent || ""}`, 2000);
-});
-
-modeSelect?.addEventListener("change", () => {
-  const projector = getProjectorById(state.venue, state.venue.activeProjectorId);
-  if (!projector) return;
-  projector.projectionMode =
-    modeSelect.value === "anamorphic" ? "anamorphic" : "projector";
-  applyVenueToRenderers();
-  persistVenueLocally();
-  broadcastVenueUpdate();
-  const statusByMode = {
-    anamorphic:
-      "Advanced: anamorphic sweet-spot — eye pose changes the 3D picture",
-    projector: "Map + keystone — drag TL/TR/BR/BL onto real corners",
-  };
-  setStatus(statusByMode[modeSelect.value] || statusByMode.projector, 2800);
-});
-
-fovInput?.addEventListener("change", () => {
-  const projector = getProjectorById(state.venue, state.venue.activeProjectorId);
-  if (!projector) return;
-  const nextFov = Number(fovInput.value);
-  if (!Number.isFinite(nextFov)) return;
-  projector.fovDegrees = Math.min(90, Math.max(15, nextFov));
-  fovInput.value = String(Math.round(projector.fovDegrees));
-  applyVenueToRenderers();
-  persistVenueLocally();
-  broadcastVenueUpdate();
-  setStatus(`Projector FOV ${Math.round(projector.fovDegrees)}°`, 1800);
-});
-
-faceSelect?.addEventListener("change", () => {
-  state.venue.calibrationFaceId = faceSelect.value;
-  applyVenueToRenderers();
-  renderHandles();
-  persistVenueLocally();
-  broadcastVenueUpdate();
-  setStatus(`Editing ${FACE_LABELS[faceSelect.value] || faceSelect.value} face`, 2000);
-});
-
-toggleLampHelper?.addEventListener("change", () => {
-  lampHelperEnabled = Boolean(toggleLampHelper.checked);
-  applyLampHelperVisibility();
-  setStatus(
-    lampHelperEnabled
-      ? "Lamp aim helper on — drag the green projector in the right pane"
-      : "Lamp aim helper off — right pane is box reference only",
-    2800
-  );
-});
-
 btnFitCorners.addEventListener("click", () => {
   const projector = getProjectorById(state.venue, state.venue.activeProjectorId);
   if (!projector) return;
@@ -1004,8 +743,6 @@ window.addEventListener("resize", () => {
   sceneRenderer.resize();
 });
 
-bindProjectorDragOnScene();
-
 const startup = loadSceneState();
 startup.testBackdrop = false;
 startup.venue = normalizeVenueState(startup.venue || {});
@@ -1016,11 +753,9 @@ if (urlProjectorId) startup.venue.activeProjectorId = urlProjectorId;
 applyScene(startup, { persist: false })
   .catch(() => applyScene(createDefaultSceneState(), { persist: false }))
   .finally(() => {
-    lampHelperEnabled = false;
     state.venue.showFrustumHelpers = false;
     applyVenueToRenderers();
     refreshBoxSizeLabel();
-    syncLampHelperToggle();
     announceReady();
     window.setTimeout(announceReady, 300);
     window.setTimeout(announceReady, 1000);

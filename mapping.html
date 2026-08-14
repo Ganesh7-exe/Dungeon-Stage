@@ -72,11 +72,7 @@
       .toolbar select,
       .toolbar button,
       .toolbar input[type="number"],
-      .steps button,
-      .advanced summary,
-      .advanced select,
-      .advanced input,
-      .advanced button {
+      .steps button {
         background: #182131;
         color: var(--text);
         border: 1px solid var(--line);
@@ -198,44 +194,6 @@
       .checkbox-inline input {
         width: auto;
         min-width: 0;
-      }
-
-      .advanced {
-        margin: 0;
-        border-bottom: 1px solid var(--line);
-        background: var(--panel);
-      }
-
-      .advanced summary {
-        display: list-item;
-        cursor: pointer;
-        padding: 0.45rem 0.85rem;
-        border: none;
-        border-radius: 0;
-        background: transparent;
-        color: var(--muted);
-      }
-
-      .advanced-body {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.75rem;
-        padding: 0 0.85rem 0.65rem;
-      }
-
-      .advanced-body label {
-        display: flex;
-        align-items: center;
-        gap: 0.35rem;
-        color: var(--muted);
-      }
-
-      .advanced-note {
-        width: 100%;
-        margin: 0;
-        color: var(--muted);
-        font-size: 0.72rem;
       }
 
       .split {
@@ -480,46 +438,6 @@
           </p>
         </div>
       </section>
-
-      <details class="advanced" id="advanced-panel">
-        <summary>Advanced — sweet-spot 3D, FOV, lamp aim helper</summary>
-        <div class="advanced-body">
-          <p class="advanced-note">
-            Use after the four corners already match the real box.
-          </p>
-          <label>
-            Style
-            <select id="mode-select">
-              <option value="projector">Map + keystone</option>
-              <option value="anamorphic">Anamorphic sweet-spot</option>
-            </select>
-          </label>
-          <label>
-            FOV
-            <input
-              id="fov-input"
-              type="number"
-              min="15"
-              max="90"
-              step="1"
-              value="40"
-              style="width: 4.2rem"
-            />
-          </label>
-          <label>
-            Face
-            <select id="face-select"></select>
-          </label>
-          <label>
-            Projector
-            <select id="projector-select"></select>
-          </label>
-          <label>
-            <input type="checkbox" id="toggle-lamp-helper" />
-            Show lamp aim helper
-          </label>
-        </div>
-      </details>
 
       <div class="split">
         <section class="pane" aria-label="Projector feed">
