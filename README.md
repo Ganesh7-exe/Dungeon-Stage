@@ -4,7 +4,7 @@ Project D&D battle maps and 3D creatures onto a physical tabletop box so the par
 
 Built with Electron + Vite + Three.js. The DM drives everything from a control window; a second window feeds the projector with anamorphic corner-pin warp so the image looks correct from the players' side of the table.
 
-![Dungeon Stage projecting a map and creature onto the box](scripts/screenshots/01-preview-standard.png)
+![Dungeon Stage control window with a creature staged above the Village of Barovia map](docs/dungeon-stage-home.png)
 
 ## What it does
 
